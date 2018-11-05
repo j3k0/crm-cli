@@ -279,11 +279,40 @@ const readColumns = async (columns) => new Promise((resolve, reject) => {
     rl.on('line', onLine);
 });
 
+const addContact = (data, filter) => {
+    console.log('Please fill in contact details:');
+    readColumns(['firstName', 'lastName', 'role', 'company', 'email', 'url'])
+    .catch(process.exit.bind(process, 1))
+    .then((contact) => {
+        // If name is filled and there isn't a company with the given name.
+        // Add it and save
+        const companyName = contact.company;
+        const company = companies(data, companyName)[0]; // fuzzy search for the company
+        delete contact.company;
+        if (company) {
+            contact.createdAt = new Date().toISOString();
+            contact.updatedAt = new Date().toISOString();
+            // Find the company in the data
+            const editCompany = data.find((c) => c.name === company.name);
+            editCompany.contacts.push(contact);
+            saveData(data);
+            console.log('Contact added.');
+            contacts(data, company.name);
+            process.exit(0);
+        }
+        else {
+            console.error(`ERROR: Company with name "${companyName}" doesn't exists.`);
+            process.exit(1);
+        }
+    });
+    return {printAsText: () => {}};
+};
+
 const addCompany = (data, filter) => {
     console.log('Please fill in company details:');
-    const company = readColumns(['name', 'address', 'url'])
+    readColumns(['name', 'address', 'url'])
     .catch(process.exit.bind(process, 1))
-    .then(async (company) => {
+    .then((company) => {
         // If name is filled and there isn't a company with the given name.
         // Add it and save
         if (company.name && !data.find((c) => c.name.toLowerCase() === company.name.toLowerCase())) {
@@ -325,6 +354,7 @@ Available commands:
  - data entry:
 
     add-company ...... register a new company.
+    add-contact ...... register a new contact.
 
 `);
 };
@@ -342,6 +372,7 @@ const commands = {
     apps,
     about,
     'add-company': addCompany,
+    'add-contact': addContact,
 };
 
 const data = loadData();
