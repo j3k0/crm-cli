@@ -11,14 +11,14 @@ const defaultTableOptions = {
 };
 
 const emailAlias = {
-    'hoelt@fovea.cc': 'JC',
+    'hoelt@fovea.cc': 'jc',
 };
 
 const fieldToText = (object, field) =>
-    ['date', 'created', 'upgraded'].indexOf(field) >= 0
+    ['date', 'created', 'upgraded', 'churned', 'followup'].indexOf(field) >= 0
         ? (object[field] && moment(new Date(object[field])).fromNow() || '')
         : field === 'from'
-        ? emailAlias[object[field]] || object[field].split('@')[0]
+        ? emailAlias[object[field]] || object[field].split(/[@.]/)[0]
         : (object[field] || '');
 
 // const loadData = () =>
@@ -67,17 +67,17 @@ const about = (data, filter, delColumns) => {
             out.push({
                 company: company.name,
                 role: c.role,
-                email: `${name} <${c.email}>`
+                email: `${name} <${c.email}>`,
             });
         });
     });
     if (filter) {
         const fuse = new Fuse(out, {
-            keys: columns,
+            keys: ['company', 'email'],
             matchAllTokens: true,
             threshold: 0.1,
             location: 0,
-            distance: 100,
+            distance: 500,
             findAllMatches: true,
         });
         out = fuse.search(filter);
@@ -117,16 +117,17 @@ const contacts = (data, filter, delColumns) => {
                 company: company.name,
                 role: c.role,
                 email: `${name} <${c.email}>`,
+                rawEmail: c.email,
             });
         });
     });
     if (filter) {
         const fuse = new Fuse(out, {
-            keys: columns,
+            keys: ['company', 'email'],
             matchAllTokens: true,
             threshold: 0.1,
             location: 0,
-            distance: 100,
+            distance: 500,
             findAllMatches: true,
         });
         out = fuse.search(filter);
@@ -145,7 +146,7 @@ const contacts = (data, filter, delColumns) => {
 
 const apps = (data, filter, delColumns) => {
     let out = [];
-    const columns = ['company', 'plan', 'created', 'upgraded', 'name', 'email'];
+    const columns = ['company', 'plan', 'created', 'upgraded', 'churned', 'name', 'email'];
     const displayColumns = columns.filter((c) => !delColumns || delColumns.indexOf(c) < 0);
     data.forEach((company) => {
         company.apps.forEach((app) => {
@@ -153,6 +154,7 @@ const apps = (data, filter, delColumns) => {
                 company: company.name,
                 created: app.createdAt,
                 upgraded: app.upgradedAt,
+                churned: app.churnedAt,
                 email: app.email,
                 name: app.appName,
                 plan: app.plan,
@@ -185,7 +187,7 @@ const apps = (data, filter, delColumns) => {
 
 const interactions = (data, filter, delColumns) => {
     let out = [];
-    const columns = ['company', 'kind', 'date', 'from', 'summary', 'fupb4'];
+    const columns = ['company', 'kind', 'date', 'from', 'summary', 'followup'];
     const displayColumns = columns.filter((c) => !delColumns || delColumns.indexOf(c) < 0);
     data.forEach((company) => {
         company.apps.forEach((app) => {
@@ -195,7 +197,7 @@ const interactions = (data, filter, delColumns) => {
                 date: app.createdAt || '',
                 from: app.email,
                 summary: `Registered ${app.appName}`,
-                fupb4: '',
+                followup: '',
             });
             if (app.upgradedAt) {
                 out.push({
@@ -204,7 +206,17 @@ const interactions = (data, filter, delColumns) => {
                     date: app.upgradedAt || '',
                     from: app.email,
                     summary: `Upgraded ${app.appName} to ${app.plan}`,
-                    fupb4: '',
+                    followup: '',
+                });
+            }
+            if (app.churnedAt) {
+                out.push({
+                    company: company.name,
+                    kind: 'system',
+                    date: app.churnedAt || '',
+                    from: app.email,
+                    summary: `Churned ${app.appName}`,
+                    followup: '',
                 });
             }
         });
@@ -215,7 +227,7 @@ const interactions = (data, filter, delColumns) => {
                 date: interaction.date || '',
                 from: interaction.from,
                 summary: interaction.summary,
-                fupb4: interaction.followUpBefore || '',
+                followup: interaction.followUpDate || '',
             });
         });
     });
@@ -254,7 +266,7 @@ const readColumns = async (columns) => new Promise((resolve, reject) => {
     });
     const onLine = function (cmd) {
         if (typed.length < columns.length) {
-            object[columns[typed.length]] = cmd;
+            object[columns[typed.length]] = cmd.replace(/([.?!]) /g, '$1\n');
             typed.push(cmd);
         }
         else if (cmd === 'y') {
@@ -279,6 +291,36 @@ const readColumns = async (columns) => new Promise((resolve, reject) => {
     rl.on('line', onLine);
 });
 
+const addApp = (data, filter) => {
+    console.log('Please fill in app details:');
+    readColumns(['appName', 'company', 'plan', 'email', 'createdAt', 'upgradedAt'])
+    .catch(process.exit.bind(process, 1))
+    .then((app) => {
+        // If name is filled and there isn't a company with the given name.
+        // Add it and save
+        const companyName = app.company;
+        const company = companies(data, companyName)[0]; // fuzzy search for the company
+        delete app.company;
+        if (company) {
+            app.createdAt = new Date(app.createdAt || undefined).toISOString();
+            app.upgradedAt = app.upgradedAt ? new Date(app.upgradedAt).toISOString() : undefined;
+            app.updatedAt = new Date().toISOString();
+            // Find the company in the data
+            const editCompany = data.find((c) => c.name === company.name);
+            editCompany.apps.push(app);
+            saveData(data);
+            console.log('App added.');
+            apps(data, company.name).printAsText();
+            process.exit(0);
+        }
+        else {
+            console.error(`ERROR: Company with name "${companyName}" doesn't exists.`);
+            process.exit(1);
+        }
+    });
+    return {printAsText: () => {}};
+};
+
 const addContact = (data, filter) => {
     console.log('Please fill in contact details:');
     readColumns(['firstName', 'lastName', 'role', 'company', 'email', 'url'])
@@ -297,7 +339,37 @@ const addContact = (data, filter) => {
             editCompany.contacts.push(contact);
             saveData(data);
             console.log('Contact added.');
-            contacts(data, company.name);
+            contacts(data, company.name).printAsText();;
+            process.exit(0);
+        }
+        else {
+            console.error(`ERROR: Company with name "${companyName}" doesn't exists.`);
+            process.exit(1);
+        }
+    });
+    return {printAsText: () => {}};
+};
+
+const addInteraction = (data, filter) => {
+    console.log('Please fill in interaction details:');
+    readColumns(['company', 'kind', 'date', 'from', 'summary', 'followUpDate'])
+    .catch(process.exit.bind(process, 1))
+    .then((interaction) => {
+        // Add it and save
+        const companyName = interaction.company;
+        const company = companies(data, companyName)[0]; // fuzzy search for the company
+        delete interaction.company;
+        const contact = contacts(data, interaction.from)[0];
+        if (company && contact) {
+            // interaction.createdAt = new Date().toISOString();
+            // Find the company in the data
+            interaction.date = interaction.date || new Date().toISOString();
+            interaction.from = contact.rawEmail;
+            const editCompany = data.find((c) => c.name === company.name);
+            editCompany.interactions.push(interaction);
+            saveData(data);
+            console.log('Interaction added.');
+            interactions(data, company.name).printAsText();;
             process.exit(0);
         }
         else {
@@ -324,7 +396,7 @@ const addCompany = (data, filter) => {
             data.push(company);
             saveData(data);
             console.log('Company added.');
-            companies(data, company.name);
+            companies(data, company.name).printAsText();;
             process.exit(0);
         }
         else {
@@ -353,8 +425,10 @@ Available commands:
 
  - data entry:
 
-    add-company ...... register a new company.
-    add-contact ...... register a new contact.
+    add-company ............ register a new company.
+    add-contact ............ register a new contact.
+    add-app ................ register a new app.
+    add-i,add-interaction .. register a new customer interaction.
 
 `);
 };
@@ -364,8 +438,10 @@ const commands = {
     int:interactions,
     interactions,
     com:companies,
+    company:companies,
     companies,
     con:contacts,
+    contact:contacts,
     contacts,
     a:apps,
     app:apps,
@@ -373,6 +449,9 @@ const commands = {
     about,
     'add-company': addCompany,
     'add-contact': addContact,
+    'add-interaction': addInteraction,
+    'add-i': addInteraction,
+    'add-app': addApp,
 };
 
 const data = loadData();
