@@ -314,7 +314,7 @@ const addApp = (data, filter) => {
         const company = companies(data, companyName)[0]; // fuzzy search for the company
         delete app.company;
         if (company) {
-            app.createdAt = new Date(app.createdAt || undefined).toISOString();
+            app.createdAt = (app.createdAt ? new Date(app.createdAt) : new Date()).toISOString();
             app.upgradedAt = app.upgradedAt ? new Date(app.upgradedAt).toISOString() : undefined;
             app.updatedAt = new Date().toISOString();
             // Find the company in the data
