@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 
 const fs = require('fs');
-const dataDir = 'data';
+const dataDir = process.cwd(); // 'data';
+const dataFile = 'crm.json';
 const Table = require('cli-table');
 const Fuse = require('fuse.js');
 const moment = require('moment');
@@ -24,10 +25,21 @@ const fieldToText = (object, field) =>
 // const loadData = () =>
 //     fs.readdirSync(dataDir).map((file) => require('./' + dataDir + '/' + file));
 
-const loadData = () => require('./data.json');
+const loadData = () => {
+    if (fs.existsSync(`${dataDir}/${dataFile}`))
+        return require(`${dataDir}/${dataFile}`);
+    else {
+        console.error(`ERROR: File ${dataDir}/${dataFile} not found.`);
+        console.error(`Run "crm init-crm" and I'll create it for you.`);
+        process.exit(1);
+    }
+};
 const saveData = (data) => {
-    fs.copyFileSync('./data.json', './data.json.bak');
-    fs.writeFileSync('./data.json', JSON.stringify(data, null, 4));
+    fs.copyFileSync(`${dataDir}/${dataFile}`, `${dataDir}/${dataFile}.bak`);
+    fs.writeFileSync(`${dataDir}/${dataFile}`, JSON.stringify(data, null, 4));
+};
+const initData = () => {
+    fs.writeFileSync(`${dataDir}/${dataFile}`, JSON.stringify([], null, 4));
 };
 
 // Reports
@@ -430,6 +442,10 @@ Available commands:
     add-app ................ register a new app.
     add-i,add-interaction .. register a new customer interaction.
 
+ - system:
+
+    init-crm ........ create data file in current directory.
+
 `);
 };
 
@@ -453,6 +469,12 @@ const commands = {
     'add-i': addInteraction,
     'add-app': addApp,
 };
+
+if (process.argv[2] === 'init-crm') {
+    initData();
+    console.log('Done.');
+    process.exit(0);
+}
 
 const data = loadData();
 const command = commands[process.argv[2]];

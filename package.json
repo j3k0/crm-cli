@@ -1,14 +1,13 @@
 {
-  "name": "billing.crm",
+  "name": "crm-cli",
   "version": "1.0.0",
-  "private": true,
-  "description": "",
+  "description": "Customer Relationship Management from your Terminal",
   "main": "crm",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "Jean-Christophe Hoelt <hoelt@fovea.cc>",
-  "license": "ISC",
+  "license": "GPL",
   "dependencies": {
     "cli-table": "^0.3.1",
     "fuse.js": "^3.3.0",
