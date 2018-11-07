@@ -1,8 +1,11 @@
 {
   "name": "crm-cli",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Customer Relationship Management from your Terminal",
   "main": "crm",
+  "bin": {
+    "crm": "./crm"
+  },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
