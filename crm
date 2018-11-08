@@ -687,6 +687,49 @@ const addInteraction = async (data, filter) => {
     return interaction;
 };
 
+const editCompany = async (data, filter) => {
+    if (!filter) {
+        console.log('Usage: crm edit-company NAME');
+        process.exit(1);
+    }
+    const company = companies(data, filter)[0]; // fuzzy search for the company
+    if (!company)
+        return;
+    let edited = Object.assign({
+        name: '',
+        url: '',
+        address: '',
+    }, company);
+    edited = await enquirer.prompt({
+        type: 'snippet',
+        name: 'company',
+        message: 'Edit Company:',
+        values: company,
+        template: Object.keys(edited)
+            .filter(k => k !== 'updatedAt' && typeof company[k] !== 'object')
+            .map((k) => `${k}: #{${k}}`)
+            .concat('#{add_field}: #{add_value}')
+            .join('\n')
+    });
+    if (edited && edited.company && edited.company.values) {
+        edited = edited.company.values;
+        if (edited.add_field)
+            edited[edited.add_field] = edited.add_value;
+        delete edited.add_field;
+        delete edited.add_value;
+        edited.updatedAt = new Date().toISOString();
+        Object.assign(company, edited);
+        saveData(data);
+        console.log('Company updated.');
+        edited.printAsText = () => {};
+        return edited;
+    }
+    else {
+        console.log('Canceled');
+        process.exit(1);
+    }
+};
+
 const addCompany = async (data, filter, values = {}) => {
     let company = Object.assign({}, values);
     console.log('');
@@ -767,6 +810,8 @@ Available commands:
     add-app ................ register a new app.
     add-i,add-interaction .. register a new customer interaction.
 
+    edit-company ........... edit an existing company.
+
  - system:
 
     init-crm ........ create data file in current directory.
@@ -797,6 +842,7 @@ const commands = {
     'add-interaction': addInteraction,
     'add-i': addInteraction,
     'add-app': addApp,
+    'edit-company': editCompany,
 };
 
 if (process.argv[2] === 'init-crm') {
