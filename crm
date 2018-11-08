@@ -6,12 +6,13 @@ const dataFile = 'crm.json';
 const Table = require('cli-table');
 const Fuse = require('fuse.js');
 const moment = require('moment');
+const enquirer = require('enquirer');
 
 const defaultTableOptions = {
     chars: {'mid': '', 'left-mid': '', 'mid-mid': '', 'right-mid': ''}
 };
 
-const emailAlias = {
+const STAFF = {
     'hoelt@fovea.cc': 'jc',
 };
 
@@ -19,7 +20,7 @@ const fieldToText = (object, field) =>
     ['date', 'created', 'upgraded', 'churned', 'followup'].indexOf(field) >= 0
         ? (object[field] && moment(new Date(object[field])).fromNow() || '')
         : field === 'from'
-        ? emailAlias[object[field]] || object[field].split(/[@.]/)[0]
+        ? STAFF[object[field]] || object[field].split(/[@.]/)[0]
         : (object[field] || '');
 
 // const loadData = () =>
@@ -364,6 +365,24 @@ const interactions = (data, filter, delColumns) => {
     return out;
 };
 
+const readColumns = async (columns) => {
+    const r = await enquirer.prompt(columns.map((c) => ({
+        type: 'input',
+        name: c,
+        message: c,
+    })));
+    let c = {};
+    while (['y','n'].indexOf(c.confirm) < 0) {
+        c = await enquirer.prompt({
+            type: 'input', name: 'confirm', message: 'Confirm? (y/n)', choices: ['y','n'],
+        });
+    }
+    if (c.confirm === 'y')
+        return r;
+    throw 'Canceled';
+};
+
+/*
 const readColumns = async (columns) => new Promise((resolve, reject) => {
     const typed = [];
     const object = {};
@@ -399,121 +418,318 @@ const readColumns = async (columns) => new Promise((resolve, reject) => {
     console.log(columns[typed.length] + ':');
     rl.on('line', onLine);
 });
+*/
 
-const addApp = (data, filter) => {
-    console.log('Please fill in app details:');
-    readColumns(['appName', 'company', 'plan', 'email', 'createdAt', 'upgradedAt'])
-    .catch(process.exit.bind(process, 1))
-    .then((app) => {
-        // If name is filled and there isn't a company with the given name.
-        // Add it and save
-        const companyName = app.company;
-        const company = companies(data, companyName)[0]; // fuzzy search for the company
-        delete app.company;
-        if (company) {
-            app.createdAt = (app.createdAt ? new Date(app.createdAt) : new Date()).toISOString();
-            app.upgradedAt = app.upgradedAt ? new Date(app.upgradedAt).toISOString() : undefined;
-            app.updatedAt = new Date().toISOString();
-            // Find the company in the data
-            const editCompany = data.find((c) => c.name === company.name);
-            editCompany.apps.push(app);
-            saveData(data);
-            console.log('App added.');
-            apps(data, company.name).printAsText();
-            process.exit(0);
-        }
-        else {
-            console.error(`ERROR: Company with name "${companyName}" doesn't exists.`);
-            process.exit(1);
-        }
-    });
-    return {printAsText: () => {}};
+const addApp = async (data, filter) => {
+    console.log('');
+    console.log('New App:');
+    console.log('--------');
+    const app = await enquirer.prompt([{
+        type: 'input',
+        name: 'appName',
+        message: 'Application Name',
+    }, {
+        type: 'autocomplete',
+        name: 'company',
+        message: 'Company Name',
+        choices: [{
+            message: 'New Company',
+            value: 'new_company',
+        }].concat(data.map((c) => c.name)),
+        limit: 10,
+    }, {
+        type: 'select',
+        name: 'plan',
+        message: 'Plan',
+        choices: ['free', 'silver', 'gold'],
+    }]);
+    
+    Object.assign(app, await enquirer.prompt([{
+        type: 'autocomplete',
+        name: 'email',
+        message: 'Contact',
+        choices: data
+            .filter(c => app.company === c.name)
+            .reduce((acc, company) =>
+                company.contacts.reduce((acc, c) => {
+                    acc.push({
+                        message: `${c.firstName} ${c.lastName} <${c.email}>`,
+                        value: c.email,
+                    });
+                    return acc;
+                }, acc), [{
+                    message: 'New Contact',
+                    value: 'new_contact',
+                }]),
+        limit: 10
+    }, {
+        type: 'input',
+        name: 'createdAt',
+        message: 'Creation date',
+    }, {
+        type: 'input',
+        name: 'upgradedAt',
+        message: 'Upgrade date',
+    }, {
+        type: 'autocomplete',
+        name: 'confirm',
+        message: 'Do you confirm?',
+        choices: ['yes', 'no'],
+    }]));
+
+    if (!app || app.confirm !== 'yes') {
+        console.log('Canceled');
+        process.exit(1);
+    }
+
+    if (app.company === 'new_company') {
+        const newCompany = await addCompany(data, undefined);
+        app.company = newCompany.name;
+    }
+
+    if (app.email === 'new_contact') {
+        const newContact = await addContact(data, undefined, {company: app.company});
+        app.email = newContact.email;
+    }
+
+    // If name is filled and there isn't a company with the given name.
+    // Add it and save
+    const companyName = app.company;
+    const company = companies(data, companyName)[0]; // fuzzy search for the company
+    delete app.company;
+    if (company) {
+        app.createdAt = (app.createdAt ? new Date(app.createdAt) : new Date()).toISOString();
+        app.upgradedAt = app.upgradedAt ? new Date(app.upgradedAt).toISOString() : undefined;
+        app.updatedAt = new Date().toISOString();
+        // Find the company in the data
+        const editCompany = data.find((c) => c.name === company.name);
+        editCompany.apps.push(app);
+        saveData(data);
+        console.log('App added.');
+    }
+    else {
+        console.error(`ERROR: Company with name "${companyName}" doesn't exists.`);
+        process.exit(1);
+    }
+    app.printAsText = () => {};
+    return app;
 };
 
-const addContact = (data, filter) => {
-    console.log('Please fill in contact details:');
-    readColumns(['firstName', 'lastName', 'role', 'company', 'email', 'url'])
-    .catch(process.exit.bind(process, 1))
-    .then((contact) => {
-        // If name is filled and there isn't a company with the given name.
-        // Add it and save
-        const companyName = contact.company;
-        const company = companies(data, companyName)[0]; // fuzzy search for the company
-        delete contact.company;
-        if (company) {
-            contact.createdAt = new Date().toISOString();
-            contact.updatedAt = new Date().toISOString();
-            // Find the company in the data
-            const editCompany = data.find((c) => c.name === company.name);
-            editCompany.contacts.push(contact);
-            saveData(data);
-            console.log('Contact added.');
-            contacts(data, company.name).printAsText();;
-            process.exit(0);
-        }
-        else {
-            console.error(`ERROR: Company with name "${companyName}" doesn't exists.`);
-            process.exit(1);
-        }
+const addContact = async (data, filter, values = {}) => {
+    let contact = Object.assign({}, values);
+    console.log('');
+    console.log('New Contact:');
+    console.log('------------');
+    if (!values.company) Object.assign(contact, await enquirer.prompt({
+        type: 'autocomplete',
+        name: 'company',
+        message: 'Company Name',
+        choices: data.map((c) => c.name),
+        limit: 10,
+    }));
+    if (!values.firstName) Object.assign(contact, await enquirer.prompt({
+        type: 'input',
+        name: 'firstName',
+        message: 'First Name',
+    }));
+    if (!values.lastName) Object.assign(contact, await enquirer.prompt({
+        type: 'input',
+        name: 'lastName',
+        message: 'Last Name',
+    }));
+    if (!values.role) Object.assign(contact, await enquirer.prompt({
+        type: 'input',
+        name: 'role',
+        message: 'Role',
+    }));
+    if (!values.role) Object.assign(contact, await enquirer.prompt({
+        type: 'input',
+        name: 'email',
+        message: 'Email',
+    }));
+    const confirm = await enquirer.prompt({
+        type: 'autocomplete',
+        name: 'value',
+        message: 'Do you confirm?',
+        choices: ['yes', 'no'],
     });
-    return {printAsText: () => {}};
+    if (!confirm || confirm.value !== 'yes') {
+        console.log('Canceled');
+        process.exit(1);
+    }
+    // If name is filled and there isn't a company with the given name.
+    // Add it and save
+    const companyName = contact.company;
+    const company = companies(data, companyName)[0]; // fuzzy search for the company
+    delete contact.company;
+    if (company) {
+        contact.createdAt = new Date().toISOString();
+        contact.updatedAt = new Date().toISOString();
+        // Find the company in the data
+        const editCompany = data.find((c) => c.name === company.name);
+        editCompany.contacts.push(contact);
+        saveData(data);
+        console.log('Contact added.');
+        // contacts(data, company.name).printAsText();;
+        // process.exit(0);
+    }
+    else {
+        console.error(`ERROR: Company with name "${companyName}" doesn't exists.`);
+        process.exit(1);
+    }
+    contact.printAsText = () => {};
+    return contact;
 };
 
-const addInteraction = (data, filter) => {
-    console.log('Please fill in interaction details:');
-    readColumns(['company', 'kind', 'date', 'from', 'summary', 'followUpDate'])
-    .catch(process.exit.bind(process, 1))
-    .then((interaction) => {
-        // Add it and save
-        const companyName = interaction.company;
-        const company = companies(data, companyName)[0]; // fuzzy search for the company
-        delete interaction.company;
-        const contact = contacts(data, interaction.from)[0];
-        if (company && contact) {
-            // interaction.createdAt = new Date().toISOString();
-            // Find the company in the data
-            interaction.date = interaction.date || new Date().toISOString();
-            interaction.from = contact.rawEmail;
-            const editCompany = data.find((c) => c.name === company.name);
-            editCompany.interactions.push(interaction);
-            saveData(data);
-            console.log('Interaction added.');
-            interactions(data, company.name).printAsText();;
-            process.exit(0);
-        }
-        else {
-            console.error(`ERROR: Company with name "${companyName}" doesn't exists.`);
-            process.exit(1);
-        }
-    });
-    return {printAsText: () => {}};
+const addInteraction = async (data, filter) => {
+    console.log('');
+    console.log('New Interaction:');
+    console.log('----------------');
+
+    const interaction = await enquirer.prompt([{
+        type: 'autocomplete',
+        name: 'company',
+        message: 'Company Name',
+        choices: [{
+            message: 'New Company',
+            value: 'new_company',
+        }].concat(data.map((c) => c.name)),
+        limit: 10,
+    }, {
+        type: 'select',
+        name: 'kind',
+        message: 'Kind',
+        choices: ['email', 'github', 'contact-form', 'phone', 'real-life', 'linkedin'],
+    }]);
+    
+    Object.assign(interaction, await enquirer.prompt([{
+        type: 'autocomplete',
+        name: 'from',
+        message: 'From',
+        choices: data
+            .filter(c => interaction.company === c.name)
+            .reduce((acc, company) =>
+                company.contacts.reduce((acc, c) => {
+                    acc.push({
+                        message: `${c.firstName} ${c.lastName} <${c.email}>`,
+                        value: c.email,
+                    });
+                    return acc;
+                }, acc), [{
+                    message: 'New Contact',
+                    value: 'new_contact',
+                }].concat(Object.keys(STAFF).map((email) => ({
+                    message: `${STAFF[email]} <${email}>`,
+                    value: email,
+                })))),
+        limit: 10
+    }, {
+        type: 'input',
+        name: 'followUpDate',
+        message: 'Follow-Up Date',
+    }, {
+        type: 'input',
+        name: 'summary',
+        message: 'Summary',
+    }, {
+        type: 'autocomplete',
+        name: 'confirm',
+        message: 'Do you confirm?',
+        choices: ['yes', 'no'],
+    }]));
+
+    if (!interaction || interaction.confirm !== 'yes') {
+        console.log('Canceled');
+        process.exit(1);
+    }
+
+    if (interaction.company === 'new_company') {
+        const newCompany = await addCompany(data, undefined);
+        interaction.company = newCompany.name;
+    }
+
+    if (interaction.from === 'new_contact') {
+        const newContact = await addContact(data, undefined, {company: interaction.company});
+        interaction.from = newContact.email;
+    }
+
+    // Add it and save
+    const companyName = interaction.company;
+    const company = companies(data, companyName)[0]; // fuzzy search for the company
+    delete interaction.company;
+    const contact = contacts(data, interaction.from)[0];
+    if (company && contact) {
+        // interaction.createdAt = new Date().toISOString();
+        // Find the company in the data
+        interaction.date = interaction.date || new Date().toISOString();
+        interaction.from = contact.rawEmail;
+        const editCompany = data.find((c) => c.name === company.name);
+        editCompany.interactions.push(interaction);
+        saveData(data);
+        console.log('Interaction added.');
+    }
+    else {
+        console.error(`ERROR: Company with name "${companyName}" doesn't exists.`);
+        process.exit(1);
+    }
+    interaction.printAsText = () => {};
+    return interaction;
 };
 
-const addCompany = (data, filter) => {
-    console.log('Please fill in company details:');
-    readColumns(['name', 'address', 'url'])
-    .catch(process.exit.bind(process, 1))
-    .then((company) => {
-        // If name is filled and there isn't a company with the given name.
-        // Add it and save
-        if (company.name && !data.find((c) => c.name.toLowerCase() === company.name.toLowerCase())) {
-            company.createdAt = new Date().toISOString();
-            company.updatedAt = new Date().toISOString();
-            company.contacts = [];
-            company.interactions = [];
-            company.apps = [];
-            data.push(company);
-            saveData(data);
-            console.log('Company added.');
-            companies(data, company.name).printAsText();;
-            process.exit(0);
-        }
-        else {
-            console.error(`ERROR: A company with name "${company.name}" already exists.`);
-            process.exit(1);
-        }
+const addCompany = async (data, filter, values = {}) => {
+    let company = Object.assign({}, values);
+    console.log('');
+    console.log('New Company:');
+    console.log('-----------');
+    if (!values.name) Object.assign(company, await enquirer.prompt({
+        type: 'input',
+        name: 'name',
+        message: 'Name',
+    }));
+    if (!values.address) Object.assign(company, await enquirer.prompt({
+        type: 'input',
+        name: 'address',
+        message: 'Address',
+    }));
+    if (!values.url) Object.assign(company, await enquirer.prompt({
+        type: 'input',
+        name: 'url',
+        message: 'URL',
+    }));
+    const confirm = await enquirer.prompt({
+        type: 'autocomplete',
+        name: 'value',
+        message: 'Do you confirm?',
+        choices: ['yes', 'no'],
     });
-    return {printAsText: () => {}};
+    if (!confirm || confirm.value !== 'yes') {
+        console.log('Canceled');
+        process.exit(1);
+    }
+    // If name is filled and there isn't a company with the given name.
+    // Add it and save
+    const found = company.name && data.find((c) => c.name.toLowerCase() === company.name.toLowerCase());
+    if (company.name && !found) {
+        company.createdAt = new Date().toISOString();
+        company.updatedAt = new Date().toISOString();
+        company.contacts = [];
+        company.interactions = [];
+        company.apps = [];
+        data.push(company);
+        saveData(data);
+        console.log('Company added.');
+        // companies(data, company.name).printAsText();;
+        // process.exit(0);
+    }
+    else if (found) {
+        console.error(`ERROR: A company with name "${company.name}" already exists.`);
+        company = found;
+    }
+    else {
+        process.exit(1);
+    }
+    company.printAsText = () => {};
+    return company;
 };
 
 // Usage
@@ -585,5 +801,7 @@ if (!command) {
     process.exit(1);
 }
 const filter = process.argv.slice(3).join(' ');
-const report = command(data, filter);
-report.printAsText();
+(async function() {
+    const report = await command(data, filter);
+    report.printAsText();
+})();
