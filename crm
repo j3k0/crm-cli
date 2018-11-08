@@ -12,9 +12,9 @@ const defaultTableOptions = {
     chars: {'mid': '', 'left-mid': '', 'mid-mid': '', 'right-mid': ''}
 };
 
-const STAFF = {
-    'hoelt@fovea.cc': 'jc',
-};
+const STAFF = {'hoelt@fovea.cc': 'jc'};
+const KINDS = ['email', 'github', 'contact-form', 'phone', 'real-life', 'linkedin'];
+const TAGS = ['registration', 'subscription'];
 
 const fieldToText = (object, field) =>
     ['date', 'created', 'upgraded', 'churned', 'followup'].indexOf(field) >= 0
@@ -262,14 +262,14 @@ const followups = (data, filter, delColumns) => {
                 }
             });
         }
-        company.interactions.filter((i) => i.followUpDate).map((i) => {
-            return {
+        company.interactions.filter((i) => i.followUpDate).forEach((i) => {
+            out.push({
                 company: company.name,
                 email: company.email,
                 tag: i.tag,
                 summary: i.summary,
                 date: i.followUpDate
-            };
+            });
         });
     });
     if (filter) {
@@ -283,7 +283,8 @@ const followups = (data, filter, delColumns) => {
         });
         out = fuse.search(filter);
     }
-    out = out.sort((a, b) => (+new Date(a.date)) - (+new Date(b.date)));
+    // out = out.filter((i) => ((+new Date(i.date) - 7 * 24 * 3600000) - (+new Date()) < 0));
+    out = out.sort((a, b) => (+new Date(b.date)) - (+new Date(a.date)));
     out.printAsText = () => {
         const table = new Table( Object.assign(
             {head: displayColumns},
@@ -599,7 +600,17 @@ const addInteraction = async (data, filter) => {
         type: 'select',
         name: 'kind',
         message: 'Kind',
-        choices: ['email', 'github', 'contact-form', 'phone', 'real-life', 'linkedin'],
+        choices: KINDS,
+    }, {
+        type: 'autocomplete',
+        name: 'tag',
+        message: 'Tag',
+        choices: [{
+            message: '<empty>',
+            value: '',
+        }].concat(TAGS),
+        limit: 10,
+    }, {
     }]);
     
     Object.assign(interaction, await enquirer.prompt([{
