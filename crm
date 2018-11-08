@@ -197,6 +197,103 @@ const apps = (data, filter, delColumns) => {
     return out;
 };
 
+class Company {
+    constructor (data) {
+        Object.assign(this, data);
+    }
+
+    get email () {
+        const fromContact = this.contacts.reduce((acc, c) => {
+            const name = `${c.firstName} ${c.lastName}`.replace(/(^ )|( $)/g, '');
+            if (name)
+                return `${name} <${c.email}>`;
+            else if (c.email)
+                return c.email;
+            else
+                return acc;
+        }, '');
+        if (fromContact) return fromContact;
+        const fromApp = this.apps.reduce((acc, a) => {
+            return a.email || acc;
+        }, '');
+        return fromApp;
+    }
+
+    hasInteraction (summary) {
+        const s = summary.toLowerCase();
+        return this.interactions
+            .filter((i) => i.summary.toLowerCase().indexOf(s) >= 0
+                || (i.tag && i.tag.indexOf(s) >= 0))
+            .length > 0;
+    }
+}
+
+const followups = (data, filter, delColumns) => {
+    let out = [];
+    const columns = ['company', 'date', 'tag', 'summary', 'email'];
+    const displayColumns = columns.filter((c) => !delColumns || delColumns.indexOf(c) < 0);
+    data.forEach((companyData) => {
+        const company = new Company(companyData);
+        if (company.noFollowUp) return;
+        // Follow-up 3 days after registration
+        if (!company.hasInteraction('registration')) {
+            company.apps.forEach((app) => {
+                out.push({
+                    company: company.name,
+                    email: company.email,
+                    tag: 'R+3d',
+                    summary: '3d after registration',
+                    date: moment(new Date(app.createdAt)).add(3, 'days').format()
+                });
+            });
+        }
+        // Follow-up after subscription
+        if (!company.hasInteraction('subscription')) {
+            company.apps.forEach((app) => {
+                if (app.upgradedAt) {
+                    out.push({
+                        company: company.name,
+                        email: company.email,
+                        tag: 'S+4w',
+                        summary: '4 weeks after subscription',
+                        date: moment(new Date(app.upgradedAt)).add(4, 'weeks').format()
+                    });
+                }
+            });
+        }
+        company.interactions.filter((i) => i.followUpDate).map((i) => {
+            return {
+                company: company.name,
+                email: company.email,
+                tag: i.tag,
+                summary: i.summary,
+                date: i.followUpDate
+            };
+        });
+    });
+    if (filter) {
+        const fuse = new Fuse(out, {
+            keys: columns,
+            matchAllTokens: true,
+            threshold: 0.1,
+            location: 0,
+            distance: 100,
+            findAllMatches: true,
+        });
+        out = fuse.search(filter);
+    }
+    out = out.sort((a, b) => (+new Date(a.date)) - (+new Date(b.date)));
+    out.printAsText = () => {
+        const table = new Table( Object.assign(
+            {head: displayColumns},
+            defaultTableOptions));
+        out.forEach((line) =>
+            table.push(displayColumns.map(cname => fieldToText(line, cname))));
+        console.log(table.toString());
+    };
+    return out;
+};
+
 const interactions = (data, filter, delColumns) => {
     let out = [];
     const columns = ['company', 'kind', 'date', 'from', 'summary', 'followup'];
@@ -434,6 +531,7 @@ Available commands:
     con,contacts ..... list of contacts.
     a,apps ........... list of apps.
     about ............ all we know about a contact / company.
+    f,followup ....... list of required follow-up.
 
  - data entry:
 
@@ -462,6 +560,10 @@ const commands = {
     a:apps,
     app:apps,
     apps,
+    f:followups,
+    fol:followups,
+    followup:followups,
+    followups,
     about,
     'add-company': addCompany,
     'add-contact': addContact,
