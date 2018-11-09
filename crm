@@ -7,6 +7,72 @@ const Table = require('cli-table');
 const Fuse = require('fuse.js');
 const moment = require('moment');
 const enquirer = require('enquirer');
+const tmp = require('tmp');
+tmp.setGracefulCleanup();
+
+//
+//
+//
+
+const spawn = require('child_process').spawn;
+
+function editFile (file) {
+    return new Promise((resolve, reject) => {
+        const ed = /^win/.test(process.platform) ? 'notepad' : 'vim';
+        const editor = process.env.VISUAL || process.env.EDITOR || ed;
+        const args = editor.split(/\s+/);
+        const bin = args.shift();
+        const ps = spawn(bin, args.concat([file]), { stdio: 'inherit' });
+        ps.on('exit', (exitCode, signal) => {
+            resolve({exitCode, signal});
+        });
+        ps.on('error', (err) => {
+            reject(err.code === 'ENOENT' ? 127 : 1);
+        });
+    });
+}
+
+async function editData (data) {
+    const tmpobj = tmp.fileSync({prefix: 'crm-', postfix: '.json'});
+    // write to file
+    fs.writeFileSync(tmpobj.name, data);
+    const ret = await editFile(tmpobj.name);
+    const content = fs.readFileSync(tmpobj.fd, {encoding: 'utf-8'});
+    tmpobj.removeCallback();
+    return content;
+}
+
+async function editJson (data) {
+    let ret = await editData(JSON.stringify(data, null, 4));
+    while (true) {
+        try {
+            return JSON.parse(ret);
+        }
+        catch (e) {
+            const action = await enquirer.prompt({
+                type: 'autocomplete',
+                name: 'value',
+                message: 'Invalid JSON: ' + e.message,
+                choices: [{
+                    message: 'Keep Editing',
+                    value: 'edit'
+                }, {
+                    message: 'Cancel',
+                    value: 'cancel'
+                }],
+            });
+            if (!action || action.value !== 'edit') {
+                console.log('Canceled');
+                process.exit(1);
+            }
+            ret = await editData(ret);
+        }
+    }
+}
+
+//
+//
+//
 
 const defaultTableOptions = {
     chars: {'mid': '', 'left-mid': '', 'mid-mid': '', 'right-mid': ''}
@@ -695,39 +761,40 @@ const editCompany = async (data, filter) => {
     const company = companies(data, filter)[0]; // fuzzy search for the company
     if (!company)
         return;
-    let edited = Object.assign({
-        name: '',
-        url: '',
-        address: '',
-    }, company);
-    edited = await enquirer.prompt({
-        type: 'snippet',
-        name: 'company',
-        message: 'Edit Company:',
-        values: company,
-        template: Object.keys(edited)
-            .filter(k => k !== 'updatedAt' && typeof company[k] !== 'object')
-            .map((k) => `${k}: #{${k}}`)
-            .concat('#{add_field}: #{add_value}')
-            .join('\n')
-    });
-    if (edited && edited.company && edited.company.values) {
-        edited = edited.company.values;
-        if (edited.add_field)
-            edited[edited.add_field] = edited.add_value;
-        delete edited.add_field;
-        delete edited.add_value;
-        edited.updatedAt = new Date().toISOString();
-        Object.assign(company, edited);
-        saveData(data);
-        console.log('Company updated.');
-        edited.printAsText = () => {};
-        return edited;
-    }
-    else {
+    const edited = await editJson(Object.assign(
+        {
+            name: '',
+            url: '',
+            address: '',
+        },
+        company,
+        {
+            updatedAt: undefined,
+            interactions: undefined,
+            apps: undefined,
+            contacts: undefined,
+        }));
+    if (!edited || !edited.name) {
         console.log('Canceled');
         process.exit(1);
     }
+    console.log(JSON.stringify(edited, null, 4));
+    const confirm = await enquirer.prompt({
+        type: 'autocomplete',
+        name: 'value',
+        message: 'Do you confirm?',
+        choices: ['yes', 'no'],
+    });
+    if (!confirm || confirm.value !== 'yes') {
+        console.log('Canceled');
+        process.exit(1);
+    }
+    Object.assign(company, edited);
+    company.updatedAt = new Date().toISOString();
+    saveData(data);
+    console.log('Company updated.');
+    company.printAsText = () => {};
+    return company;
 };
 
 const addCompany = async (data, filter, values = {}) => {
