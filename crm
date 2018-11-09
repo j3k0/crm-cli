@@ -39,6 +39,8 @@ async function editData (data) {
     const ret = await editFile(tmpobj.name);
     const content = fs.readFileSync(tmpobj.fd, {encoding: 'utf-8'});
     tmpobj.removeCallback();
+    if (content === data)
+        throw 'Canceled. Content didn\'t change.';
     return content;
 }
 
@@ -108,6 +110,35 @@ const saveData = (data) => {
 const initData = () => {
     fs.writeFileSync(`${dataDir}/${dataFile}`, JSON.stringify([], null, 4));
 };
+
+// Requests
+const allContacts = (data) =>
+    data.reduce((acc, company) => company.contacts.reduce((acc, contact) =>
+        acc.push(contact) && acc, acc), []);
+const allApps = (data) =>
+    data.reduce((acc, company) => company.apps.reduce((acc, app) =>
+        acc.push(app) && acc, acc), []);
+
+const fuseFind = (keys, data, search) =>
+    (new Fuse(data,
+        Object.assign({
+            matchAllTokens: true,
+            threshold: 0.1,
+            location: 0,
+            distance: 100,
+            findAllMatches: true,
+            limit: 1,
+        }, {keys})))
+        .search(search)[0];
+
+const findContact = (data, search) =>
+    fuseFind(['firstName', 'lastName', 'email'], allContacts(data), search);
+
+const findCompany = (data, search) =>
+    fuseFind(['name'], data, search);
+
+const findApp = (data, search) =>
+    fuseFind(['appName', 'email'], allApps(data), search);
 
 // Reports
 const companies = (data, filter, delColumns) => {
@@ -537,17 +568,8 @@ const addApp = async (data, filter) => {
         type: 'input',
         name: 'upgradedAt',
         message: 'Upgrade date',
-    }, {
-        type: 'autocomplete',
-        name: 'confirm',
-        message: 'Do you confirm?',
-        choices: ['yes', 'no'],
     }]));
-
-    if (!app || app.confirm !== 'yes') {
-        console.log('Canceled');
-        process.exit(1);
-    }
+    await doYouConfirm();
 
     if (app.company === 'new_company') {
         const newCompany = await addCompany(data, undefined);
@@ -562,7 +584,7 @@ const addApp = async (data, filter) => {
     // If name is filled and there isn't a company with the given name.
     // Add it and save
     const companyName = app.company;
-    const company = companies(data, companyName)[0]; // fuzzy search for the company
+    const company = findCompany(data, companyName); // fuzzy search for the company
     delete app.company;
     if (company) {
         app.createdAt = (app.createdAt ? new Date(app.createdAt) : new Date()).toISOString();
@@ -614,20 +636,11 @@ const addContact = async (data, filter, values = {}) => {
         name: 'email',
         message: 'Email',
     }));
-    const confirm = await enquirer.prompt({
-        type: 'autocomplete',
-        name: 'value',
-        message: 'Do you confirm?',
-        choices: ['yes', 'no'],
-    });
-    if (!confirm || confirm.value !== 'yes') {
-        console.log('Canceled');
-        process.exit(1);
-    }
+    await doYouConfirm();
     // If name is filled and there isn't a company with the given name.
     // Add it and save
     const companyName = contact.company;
-    const company = companies(data, companyName)[0]; // fuzzy search for the company
+    const company = findCompany(data, companyName); // fuzzy search for the company
     delete contact.company;
     if (company) {
         contact.createdAt = new Date().toISOString();
@@ -708,17 +721,8 @@ const addInteraction = async (data, filter) => {
         type: 'input',
         name: 'summary',
         message: 'Summary',
-    }, {
-        type: 'autocomplete',
-        name: 'confirm',
-        message: 'Do you confirm?',
-        choices: ['yes', 'no'],
     }]));
-
-    if (!interaction || interaction.confirm !== 'yes') {
-        console.log('Canceled');
-        process.exit(1);
-    }
+    await doYouConfirm();
 
     if (interaction.company === 'new_company') {
         const newCompany = await addCompany(data, undefined);
@@ -732,7 +736,7 @@ const addInteraction = async (data, filter) => {
 
     // Add it and save
     const companyName = interaction.company;
-    const company = companies(data, companyName)[0]; // fuzzy search for the company
+    const company = findCompany(data, companyName); // fuzzy search for the company
     delete interaction.company;
     const contact = contacts(data, interaction.from)[0];
     if (company && contact) {
@@ -753,12 +757,90 @@ const addInteraction = async (data, filter) => {
     return interaction;
 };
 
+const doYouConfirm = async (message) => {
+    if (message)
+        console.log(message);
+    const confirm = await enquirer.prompt({
+        type: 'autocomplete',
+        name: 'value',
+        message: 'Do you confirm?',
+        choices: ['Confirm', 'Cancel'],
+    });
+    if (!confirm || confirm.value !== 'Confirm') {
+        console.log('Canceled');
+        process.exit(1);
+    }
+};
+
+const editApp = async (data, filter) => {
+    if (!filter) {
+        console.log('Usage: crm edit-app NAME');
+        process.exit(1);
+    }
+    const app = findApp(data, filter); // fuzzy search for the company
+    if (!app)
+        return;
+    const edited = await editJson(Object.assign(
+        {
+            appName: '',
+            plan: 'free',
+            email: '',
+        },
+        app,
+        {
+            updatedAt: undefined,
+        }));
+    if (!edited || !edited.appName) {
+        console.log('Canceled');
+        process.exit(1);
+    }
+    await doYouConfirm(JSON.stringify(edited, null, 4));
+    Object.assign(app, edited);
+    app.updatedAt = new Date().toISOString();
+    saveData(data);
+    console.log('Contact updated.');
+    app.printAsText = () => {};
+    return app;
+};
+
+const editContact = async (data, filter) => {
+    if (!filter) {
+        console.log('Usage: crm edit-contact NAME');
+        process.exit(1);
+    }
+    const contact = findContact(data, filter); // fuzzy search for the company
+    if (!contact)
+        return;
+    const edited = await editJson(Object.assign(
+        {
+            firstName: '',
+            lastName: '',
+            email: '',
+            url: '',
+        },
+        contact,
+        {
+            updatedAt: undefined,
+        }));
+    if (!edited || !edited.email) {
+        console.log('Canceled');
+        process.exit(1);
+    }
+    await doYouConfirm(JSON.stringify(edited, null, 4));
+    Object.assign(contact, edited);
+    contact.updatedAt = new Date().toISOString();
+    saveData(data);
+    console.log('Contact updated.');
+    contact.printAsText = () => {};
+    return contact;
+};
+
 const editCompany = async (data, filter) => {
     if (!filter) {
         console.log('Usage: crm edit-company NAME');
         process.exit(1);
     }
-    const company = companies(data, filter)[0]; // fuzzy search for the company
+    const company = findCompany(data, filter); // fuzzy search for the company
     if (!company)
         return;
     const edited = await editJson(Object.assign(
@@ -778,17 +860,7 @@ const editCompany = async (data, filter) => {
         console.log('Canceled');
         process.exit(1);
     }
-    console.log(JSON.stringify(edited, null, 4));
-    const confirm = await enquirer.prompt({
-        type: 'autocomplete',
-        name: 'value',
-        message: 'Do you confirm?',
-        choices: ['yes', 'no'],
-    });
-    if (!confirm || confirm.value !== 'yes') {
-        console.log('Canceled');
-        process.exit(1);
-    }
+    await doYouConfirm(JSON.stringify(edited, null, 4));
     Object.assign(company, edited);
     company.updatedAt = new Date().toISOString();
     saveData(data);
@@ -817,16 +889,7 @@ const addCompany = async (data, filter, values = {}) => {
         name: 'url',
         message: 'URL',
     }));
-    const confirm = await enquirer.prompt({
-        type: 'autocomplete',
-        name: 'value',
-        message: 'Do you confirm?',
-        choices: ['yes', 'no'],
-    });
-    if (!confirm || confirm.value !== 'yes') {
-        console.log('Canceled');
-        process.exit(1);
-    }
+    await doYouConfirm();
     // If name is filled and there isn't a company with the given name.
     // Add it and save
     const found = company.name && data.find((c) => c.name.toLowerCase() === company.name.toLowerCase());
@@ -839,8 +902,6 @@ const addCompany = async (data, filter, values = {}) => {
         data.push(company);
         saveData(data);
         console.log('Company added.');
-        // companies(data, company.name).printAsText();;
-        // process.exit(0);
     }
     else if (found) {
         console.error(`ERROR: A company with name "${company.name}" already exists.`);
@@ -878,6 +939,8 @@ Available commands:
     add-i,add-interaction .. register a new customer interaction.
 
     edit-company ........... edit an existing company.
+    edit-contact ........... edit an existing contact.
+    edit-app ............... edit an existing app.
 
  - system:
 
@@ -910,6 +973,8 @@ const commands = {
     'add-i': addInteraction,
     'add-app': addApp,
     'edit-company': editCompany,
+    'edit-contact': editContact,
+    'edit-app': editApp,
 };
 
 if (process.argv[2] === 'init-crm') {
@@ -926,6 +991,12 @@ if (!command) {
 }
 const filter = process.argv.slice(3).join(' ');
 (async function() {
-    const report = await command(data, filter);
-    report.printAsText();
+    try {
+        const report = await command(data, filter);
+        if (report && report.printAsText)
+            report.printAsText();
+    }
+    catch (e) {
+        console.error(e);
+    }
 })();
