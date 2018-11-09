@@ -10,6 +10,10 @@ const enquirer = require('enquirer');
 const tmp = require('tmp');
 tmp.setGracefulCleanup();
 
+const STAFF = {'hoelt@fovea.cc': 'jc'};
+const KINDS = ['email', 'github', 'contact-form', 'phone', 'real-life', 'linkedin'];
+const TAGS = ['registration', 'subscription'];
+
 //
 //
 //
@@ -80,15 +84,11 @@ const defaultTableOptions = {
     chars: {'mid': '', 'left-mid': '', 'mid-mid': '', 'right-mid': ''}
 };
 
-const STAFF = {'hoelt@fovea.cc': 'jc'};
-const KINDS = ['email', 'github', 'contact-form', 'phone', 'real-life', 'linkedin'];
-const TAGS = ['registration', 'subscription'];
-
 const fieldToText = (object, field) =>
     ['date', 'created', 'upgraded', 'churned', 'followup'].indexOf(field) >= 0
         ? (object[field] && moment(new Date(object[field])).fromNow() || '')
         : field === 'from'
-        ? STAFF[object[field]] || object[field].split(/[@.]/)[0]
+        ? STAFF[object.from] || object.from.split(/[@.]/)[0]
         : (object[field] || '');
 
 // const loadData = () =>
@@ -434,7 +434,7 @@ const interactions = (data, filter, delColumns) => {
                 kind: interaction.kind || '',
                 date: interaction.date || '',
                 from: interaction.from,
-                summary: interaction.summary,
+                summary: interaction.summary.replace(/([.?!]) /g, '$1\n'),
                 followup: interaction.followUpDate || '',
             });
         });
@@ -591,8 +591,7 @@ const addApp = async (data, filter) => {
         app.upgradedAt = app.upgradedAt ? new Date(app.upgradedAt).toISOString() : undefined;
         app.updatedAt = new Date().toISOString();
         // Find the company in the data
-        const editCompany = data.find((c) => c.name === company.name);
-        editCompany.apps.push(app);
+        company.apps.push(app);
         saveData(data);
         console.log('App added.');
     }
@@ -646,8 +645,7 @@ const addContact = async (data, filter, values = {}) => {
         contact.createdAt = new Date().toISOString();
         contact.updatedAt = new Date().toISOString();
         // Find the company in the data
-        const editCompany = data.find((c) => c.name === company.name);
-        editCompany.contacts.push(contact);
+        company.contacts.push(contact);
         saveData(data);
         console.log('Contact added.');
         // contacts(data, company.name).printAsText();;
@@ -723,6 +721,7 @@ const addInteraction = async (data, filter) => {
         message: 'Summary',
     }]));
     await doYouConfirm();
+    interaction.tag = interaction.tag.replace('<empty>', '');
 
     if (interaction.company === 'new_company') {
         const newCompany = await addCompany(data, undefined);
@@ -738,19 +737,22 @@ const addInteraction = async (data, filter) => {
     const companyName = interaction.company;
     const company = findCompany(data, companyName); // fuzzy search for the company
     delete interaction.company;
-    const contact = contacts(data, interaction.from)[0];
+    const contact = findContact(data, interaction.from);
     if (company && contact) {
         // interaction.createdAt = new Date().toISOString();
         // Find the company in the data
         interaction.date = interaction.date || new Date().toISOString();
-        interaction.from = contact.rawEmail;
-        const editCompany = data.find((c) => c.name === company.name);
-        editCompany.interactions.push(interaction);
+        interaction.from = contact.email;
+        company.interactions.push(interaction);
         saveData(data);
         console.log('Interaction added.');
     }
-    else {
+    else if (!company) {
         console.error(`ERROR: Company with name "${companyName}" doesn't exists.`);
+        process.exit(1);
+    }
+    else if (!contact) {
+        console.error(`ERROR: Contact with email "${interaction.from}" doesn't exists.`);
         process.exit(1);
     }
     interaction.printAsText = () => {};
