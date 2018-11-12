@@ -334,7 +334,7 @@ const followups = (data, filter, delColumns) => {
         const company = new Company(companyData);
         if (company.noFollowUp) return;
         // Follow-up 3 days after registration
-        if (!company.hasInteraction('registration')) {
+        if (!company.hasInteraction('registration') && !company.hasInteraction('subscription')) {
             company.apps.forEach((app) => {
                 out.push({
                     company: company.name,
@@ -776,7 +776,7 @@ const addInteraction = async (data, filter) => {
         choices: [{
             message: 'New Company',
             value: 'new_company',
-        }].concat(data.map((c) => c.name)),
+        }].concat(companies(data, filter).map((c) => c.name)),
         limit: 10,
     }, {
         type: 'select',
