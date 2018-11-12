@@ -463,6 +463,111 @@ const interactions = (data, filter, delColumns) => {
     return out;
 };
 
+const templateHelp = async (data, arg) => {
+    return { printAsText: () => console.log(`
+Here are the available template fields.
+
+{{EMAIL}} .............. Contact's raw email (example: user@example.com
+{{FULL_EMAIL}} ......... Contact's full email (example: Jon Snow <jon.snow@example.com>)
+{{FULL_NAME}} .......... Contact's full name (example: Henry Ford)
+{{NAME}} ............... Alias to {{FULL_NAME}}
+{{FIRST_NAME}} ......... Contact's first name
+{{LAST_NAME}} .......... Contact's last name
+{{FRIENDLY_NAME}} ...... Contact's first name, company name when unknown.
+{{APP_NAME}} ........... The appName
+{{APP_PLAN}} ........... The plan user's is registered to
+{{REGISTRATION_AGO}} ... Time since registration (example: 2 days ago)
+{{SUBSCRIPTION_AGO}} ... Time since subscription
+{{COMPANY_AGO}} ........ Time since first contact with the company
+{{COMPANY_NAME}} ....... Name of the company
+{{COMPANY_URL}} ........ Company's URL
+{{COMPANY_ADDRESS}} .... Company's website
+    `) };
+};
+
+const template = async (data, arg) => {
+    const [fileName, ...filterArray] = arg.split(' ');
+    const filter = filterArray.join(' ');
+    if (!fileName || !filter)
+        throw 'Usage: crm template <TEMPLATE_FILE> <filter>'
+    if (!fs.existsSync(fileName))
+        throw `ERROR: ${fileName} does not exists.`;
+    let content = fs.readFileSync(fileName, {encoding:'utf-8'});
+
+    let app = apps(data, filter);
+    let contact = contacts(data, filter);
+    let company = companies(data, filter);
+
+    // If any results are non-ambiguous
+    if (app && app.length === 1) {
+        contact = findContact(data, app[0].email);
+        company = findCompany(data, app[0].company);
+        app = findApp(data, app[0].email);
+    }
+    else if (contact && contact.length === 1) {
+        app = findApp(data, contact[0].company);
+        company = findCompany(data, contact[0].company);
+        contact = findContact(data, contact[0].email);
+    }
+    else if (company && company.length === 1) {
+        app = findApp(data, company[0].name);
+        contact = findContact(data, company[0].name);
+        company = findCompany(data, company[0].name);
+    }
+    // If some results are ambiguous, pick app, or contact, or company
+    else if (app && app.length > 1) {
+        contact = findContact(data, app[0].email);
+        company = findCompany(data, app[0].company);
+        app = findApp(data, app[0].email);
+    }
+    else if (contact && contact.length > 1) {
+        app = findApp(data, contact[0].company);
+        company = findCompany(data, contact[0].company);
+        contact = findContact(data, contact[0].email);
+    }
+    else if (company && company.length > 1) {
+        app = findApp(data, company[0].name);
+        contact = findContact(data, company[0].name);
+        company = findCompany(data, company[0].name);
+    }
+    // Else, no result
+    else {
+        throw 'ERROR: No contact found.';
+    }
+
+    if (!contact && company) {
+        contact = company.contacts[0];
+    }
+
+    if (contact) {
+        const defaultName = company.name || app.appName || 'user'
+        const friendlyName = contact.firstName || defaultName;
+        const name = `${contact.firstName} ${contact.lastName}`.replace(/(^ )|( $)/g, '') || defaultName;
+        content = content.replace(new RegExp('{{EMAIL}}', 'g'), `${contact.email}`);
+        content = content.replace(new RegExp('{{FULL_EMAIL}}', 'g'), `${name} <${contact.email}>`);
+        content = content.replace(new RegExp('{{FULL_NAME}}', 'g'), name);
+        content = content.replace(new RegExp('{{NAME}}', 'g'), name);
+        content = content.replace(new RegExp('{{FRIENDLY_NAME}}', 'g'), friendlyName);
+        content = content.replace(new RegExp('{{FIRST_NAME}}', 'g'), contact.firstName);
+        content = content.replace(new RegExp('{{LAST_NAME}}', 'g'), contact.lastName);
+    }
+    if (app) {
+        content = content.replace(new RegExp('{{APP_NAME}}', 'g'), app.appName);
+        content = content.replace(new RegExp('{{APP_PLAN}}', 'g'), app.plan);
+        content = content.replace(new RegExp('{{REGISTRATION_AGO}}', 'g'), moment(new Date(app.createdAt)).fromNow());
+        content = content.replace(new RegExp('{{SUBSCRIPTION_AGO}}', 'g'), moment(new Date(app.upgradedAt)).fromNow());
+    }
+    if (company) {
+        content = content.replace(new RegExp('{{COMPANY_AGO}}', 'g'), moment(new Date(company.createdAt)).fromNow());
+        content = content.replace(new RegExp('{{COMPANY_NAME}}', 'g'), company.name);
+        content = content.replace(new RegExp('{{COMPANY_URL}}', 'g'), company.url);
+        content = content.replace(new RegExp('{{COMPANY_ADDRESS}}', 'g'), company.address);
+    }
+    return {
+        printAsText: () => console.log(content)
+    };
+};
+
 const readColumns = async (columns) => {
     const r = await enquirer.prompt(columns.map((c) => ({
         type: 'input',
@@ -944,6 +1049,11 @@ Available commands:
     edit-contact ........... edit an existing contact.
     edit-app ............... edit an existing app.
 
+ - email:
+
+    template FILE .......... fill in values for an email template.
+    template-help .......... show the list of template fields.
+
  - system:
 
     init-crm ........ create data file in current directory.
@@ -977,6 +1087,8 @@ const commands = {
     'edit-company': editCompany,
     'edit-contact': editContact,
     'edit-app': editApp,
+    'template-help': templateHelp,
+    template,
 };
 
 if (process.argv[2] === 'init-crm') {

@@ -46,6 +46,7 @@ Available commands:
     con,contacts ..... list of contacts.
     a,apps ........... list of apps.
     about ............ all we know about a contact / company.
+    f,followup ....... list of required follow-up.
 
  - data entry:
 
@@ -54,9 +55,19 @@ Available commands:
     add-app ................ register a new app.
     add-i,add-interaction .. register a new customer interaction.
 
+    edit-company ........... edit an existing company.
+    edit-contact ........... edit an existing contact.
+    edit-app ............... edit an existing app.
+
+ - email:
+
+    template FILE .......... fill in values for an email template.
+    template-help .......... show the list of template fields.
+
  - system:
 
     init-crm ........ create data file in current directory.
+
 ```
 
 ## Note on filters
@@ -73,6 +84,23 @@ Examples:
 ## Best practices
 
  * Put the `crm.json` file in version control.
+
+## Template emails
+
+Here is how I use the template feature.
+
+I create a file that contains the headers and body of an email (see templates/subscriber-followup.txt for an example)
+
+To initiate an email to our newly subscribed customer (Microsoftware in this example):
+
+```
+crm template tempates/fup-registration.txt Microsoftware > email.txt
+neomutt -H email.txt
+```
+
+This will open a Draft in mutt with all fields replaced.
+
+I guess not everyone uses neomutt, but it's easy to adjust to your need. You can simply paste the output of the `crm template` command and compose your email from gmail or whatever.
 
 ## Data format
 

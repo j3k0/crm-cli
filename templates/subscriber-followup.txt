@@ -1,0 +1,12 @@
+To: {{FULL_EMAIL}}
+Subject: {{APP_NAME}} on SaaS
+
+Hi {{FRIENDLY_NAME}},
+
+I'm Jon Snow from Fovea. You've subscribed {{SUBSCRIPTION_AGO}} to out service.
+I'd like to check with you if everything works as you like.
+
+Blah blah.
+
+Yours truely,
+-J
