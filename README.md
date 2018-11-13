@@ -55,9 +55,11 @@ Available commands:
     add-app ................ register a new app.
     add-i,add-interaction .. register a new customer interaction.
 
-    edit-company ........... edit an existing company.
-    edit-contact ........... edit an existing contact.
-    edit-app ............... edit an existing app.
+    edit-company .............. edit an existing company.
+    edit-contact .............. edit an existing contact.
+    edit-app .................. edit an existing app.
+    edit-i,edit-interaction ... edit an existing interaction.
+    done ...................... remove follow-up date from interaction.
 
  - email:
 

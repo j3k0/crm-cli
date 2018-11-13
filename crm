@@ -140,6 +140,16 @@ const findCompany = (data, search) =>
 const findApp = (data, search) =>
     fuseFind(['appName', 'email'], allApps(data), search);
 
+const findInteraction = (data, index) => {
+    index = index|0;
+    let id = 1;
+    for (const company of data)
+        for (const interaction of company.interactions)
+            if (id++ === index)
+                return interaction;
+    return null;
+};
+
 // Reports
 const companies = (data, filter, delColumns) => {
     const columns = ['name', 'url', 'address'];
@@ -328,8 +338,9 @@ class Company {
 
 const followups = (data, filter, delColumns) => {
     let out = [];
-    const columns = ['company', 'date', 'tag', 'summary', 'email'];
+    const columns = ['id', 'company', 'date', 'tag', 'summary', 'email'];
     const displayColumns = columns.filter((c) => !delColumns || delColumns.indexOf(c) < 0);
+    let id = 1;
     data.forEach((companyData) => {
         const company = new Company(companyData);
         if (company.noFollowUp) return;
@@ -359,15 +370,14 @@ const followups = (data, filter, delColumns) => {
                 }
             });
         }
-        company.interactions.filter((i) => i.followUpDate).forEach((i) => {
-            out.push({
-                company: company.name,
-                email: company.email,
-                tag: i.tag,
-                summary: i.summary,
-                date: i.followUpDate
-            });
-        });
+        company.interactions.map((i) => ({
+            id: id++,
+            company: company.name,
+            email: company.email,
+            tag: i.tag,
+            summary: i.summary,
+            date: i.followUpDate
+        })).filter((i) => i.date).forEach((i) => out.push(i));
     });
     if (filter) {
         const fuse = new Fuse(out, {
@@ -393,10 +403,18 @@ const followups = (data, filter, delColumns) => {
     return out;
 };
 
+const interactionId = (companyName, date, summary) =>
+    md5(`${companyName}:${date}:${summary}`).slice(0, 4);
+
 const interactions = (data, filter, delColumns) => {
     let out = [];
-    const columns = ['company', 'kind', 'date', 'from', 'summary', 'followup'];
+    const columns = ['id', 'company', 'kind', 'date', 'from', 'summary', 'followup'];
     const displayColumns = columns.filter((c) => !delColumns || delColumns.indexOf(c) < 0);
+    let id = 1;
+    function pushWithId(data) {
+        data.id = id++; // interactionId(data.company, data.date, 'registration');
+        out.push(data);
+    }
     data.forEach((company) => {
         company.apps.forEach((app) => {
             out.push({
@@ -429,7 +447,7 @@ const interactions = (data, filter, delColumns) => {
             }
         });
         company.interactions.forEach((interaction) => {
-            out.push({
+            pushWithId({
                 company: company.name,
                 kind: interaction.kind || '',
                 date: interaction.date || '',
@@ -910,6 +928,63 @@ const editApp = async (data, filter) => {
     return app;
 };
 
+const doneInteraction = async (data, filter) => {
+    if (!filter) {
+        console.log('Usage: crm done ID');
+        process.exit(1);
+    }
+    let interaction;
+    if ('' + parseInt(filter) === filter) {
+        interaction = findInteraction(data, filter);
+        if (!interaction)
+            throw `ERROR: Interaction with ID "${filter}" not found.`;
+        interaction.updatedAt = new Date().toISOString();
+        interaction.followUpDate = undefined;
+        await doYouConfirm(JSON.stringify(interaction, null, 4));
+        saveData(data);
+        console.log('Interaction updated.');
+    }
+    return { printAsText: () => {} };
+};
+
+const editInteraction = async (data, filter) => {
+    if (!filter) {
+        console.log('Usage: crm edit-interaction ID');
+        process.exit(1);
+    }
+    let interaction;
+    if ('' + parseInt(filter) === filter) {
+        interaction = findInteraction(data, filter);
+        if (!interaction)
+            throw `ERROR: Interaction with ID "${filter}" not found.`;
+        const edited = await editJson(Object.assign(
+            {
+                followUpDate: '',
+                tag: '',
+                summary: '',
+                from: '',
+                kind: '',
+            },
+            interaction,
+            {
+                updatedAt: undefined,
+            }));
+        if (!edited || !edited.summary) {
+            console.log('Canceled');
+            process.exit(1);
+        }
+        await doYouConfirm(JSON.stringify(edited, null, 4));
+        Object.assign(interaction, edited);
+        interaction.updatedAt = new Date().toISOString();
+        saveData(data);
+        console.log('Interaction updated.');
+    }
+    if (!interaction)
+        interaction = {};
+    interaction.printAsText = () => {};
+    return interaction;
+};
+
 const editContact = async (data, filter) => {
     if (!filter) {
         console.log('Usage: crm edit-contact NAME');
@@ -1040,14 +1115,16 @@ Available commands:
 
  - data entry:
 
-    add-company ............ register a new company.
-    add-contact ............ register a new contact.
-    add-app ................ register a new app.
-    add-i,add-interaction .. register a new customer interaction.
+    add-company ............... register a new company.
+    add-contact ............... register a new contact.
+    add-app ................... register a new app.
+    add-i,add-interaction ..... register a new customer interaction.
 
-    edit-company ........... edit an existing company.
-    edit-contact ........... edit an existing contact.
-    edit-app ............... edit an existing app.
+    edit-company .............. edit an existing company.
+    edit-contact .............. edit an existing contact.
+    edit-app .................. edit an existing app.
+    edit-i,edit-interaction ... edit an existing interaction.
+    done ...................... remove follow-up date from interaction.
 
  - email:
 
@@ -1086,7 +1163,10 @@ const commands = {
     'add-app': addApp,
     'edit-company': editCompany,
     'edit-contact': editContact,
+    'edit-interaction': editInteraction,
+    'edit-i': editInteraction,
     'edit-app': editApp,
+    'done': doneInteraction,
     'template-help': templateHelp,
     template,
 };
