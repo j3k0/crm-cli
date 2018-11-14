@@ -11,8 +11,8 @@ const tmp = require('tmp');
 tmp.setGracefulCleanup();
 
 const STAFF = {'hoelt@fovea.cc': 'jc'};
-const KINDS = ['email', 'github', 'contact-form', 'phone', 'real-life', 'linkedin'];
-const TAGS = ['registration', 'subscription'];
+const KINDS = ['email', 'github', 'contact-form', 'phone', 'real-life', 'linkedin', 'none'];
+const TAGS = ['registration', 'subscription', 'bug', 'question'];
 
 //
 //
@@ -390,7 +390,8 @@ const followups = (data, filter, delColumns) => {
         });
         out = fuse.search(filter);
     }
-    // out = out.filter((i) => ((+new Date(i.date) - 7 * 24 * 3600000) - (+new Date()) < 0));
+    // Only keep what's due in less than 3 days
+    out = out.filter((i) => ((+new Date(i.date) - 3 * 24 * 3600000) - (+new Date()) < 0));
     out = out.sort((a, b) => (+new Date(b.date)) - (+new Date(a.date)));
     out.printAsText = () => {
         const table = new Table( Object.assign(
@@ -787,14 +788,26 @@ const addInteraction = async (data, filter) => {
     console.log('New Interaction:');
     console.log('----------------');
 
+    let listOfCompanies = companies(data, filter);
+    if (listOfCompanies.length === 0) {
+        const contact = contacts(data, filter);
+        if (contact.length > 0)
+            listOfCompanies = companies(data, contact[0].company);
+    }
+    const newCompany = {
+        message: 'New Company',
+        value: 'new_company',
+    };
+    if (listOfCompanies.length == 1)
+        listOfCompanies = listOfCompanies.concat([newCompany]);
+    else
+        listOfCompanies = [newCompany].concat(listOfCompanies);
+
     const interaction = await enquirer.prompt([{
         type: 'autocomplete',
         name: 'company',
         message: 'Company Name',
-        choices: [{
-            message: 'New Company',
-            value: 'new_company',
-        }].concat(companies(data, filter).map((c) => c.name)),
+        choices: listOfCompanies.map((c) => c.name || c),
         limit: 10,
     }, {
         type: 'select',
