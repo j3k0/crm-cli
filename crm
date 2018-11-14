@@ -754,7 +754,7 @@ const addContact = async (data, filter, values = {}) => {
         name: 'role',
         message: 'Role',
     }));
-    if (!values.role) Object.assign(contact, await enquirer.prompt({
+    if (!values.email) Object.assign(contact, await enquirer.prompt({
         type: 'input',
         name: 'email',
         message: 'Email',
@@ -768,6 +768,8 @@ const addContact = async (data, filter, values = {}) => {
     if (company) {
         contact.createdAt = new Date().toISOString();
         contact.updatedAt = new Date().toISOString();
+        contact.firstName = contact.firstName || '';
+        contact.lastName = contact.lastName || '';
         // Find the company in the data
         company.contacts.push(contact);
         saveData(data);
