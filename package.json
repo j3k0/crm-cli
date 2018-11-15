@@ -2,7 +2,7 @@
   "name": "crm-cli",
   "version": "1.3.0",
   "description": "Customer Relationship Management from your Terminal",
-  "main": "lib",
+  "main": "lib.js",
   "bin": {
     "crm": "./crm"
   },
