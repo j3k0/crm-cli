@@ -797,6 +797,11 @@ const addInteraction = async (data, filter) => {
         if (contact.length > 0)
             listOfCompanies = companies(data, contact[0].company);
     }
+    if (listOfCompanies.length === 0) {
+        const app = apps(data, filter);
+        if (app.length > 0)
+            listOfCompanies = companies(data, app[0].company);
+    }
     const newCompany = {
         message: 'New Company',
         value: 'new_company',
