@@ -791,6 +791,8 @@ const addInteraction = async (data, filter) => {
     console.log('New Interaction:');
     console.log('----------------');
 
+    const listOfSummaries = interactions(data).map(x => x.summary) || [];
+
     let listOfCompanies = companies(data, filter);
     if (listOfCompanies.length === 0) {
         const contact = contacts(data, filter);
@@ -818,7 +820,7 @@ const addInteraction = async (data, filter) => {
         choices: listOfCompanies.map((c) => c.name || c),
         limit: 10,
     }, {
-        type: 'select',
+        type: 'autocomplete',
         name: 'kind',
         message: 'Kind',
         choices: KINDS,
@@ -833,6 +835,8 @@ const addInteraction = async (data, filter) => {
         limit: 10,
     }, {
     }]);
+
+    let newSummary = '';
     
     Object.assign(interaction, await enquirer.prompt([{
         type: 'autocomplete',
@@ -860,12 +864,27 @@ const addInteraction = async (data, filter) => {
         name: 'followUpDate',
         message: 'Follow-Up Date',
     }, {
-        type: 'input',
+        type: 'autocomplete',
         name: 'summary',
         message: 'Summary',
+        limit: 3,
+        choices: listOfSummaries.concat({
+            value: 'new_summary',
+            message: '',
+        }),
+        suggest: (input, choices) => {
+            const ilc = input.toLowerCase();
+            return choices.filter(choice =>
+                choice.value === 'new_summary'
+                && (newSummary = choice.message = input)
+                || choice.message.toLowerCase().startsWith(ilc));
+        },
     }]));
     await doYouConfirm();
     interaction.tag = interaction.tag.replace('<empty>', '');
+
+    if (interaction.summary === 'new_summary')
+        interaction.summary = newSummary;
 
     if (interaction.company === 'new_company') {
         const newCompany = await addCompany(data, undefined);
