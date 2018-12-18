@@ -791,7 +791,12 @@ const addInteraction = async (data, filter) => {
     console.log('New Interaction:');
     console.log('----------------');
 
-    const listOfSummaries = interactions(data).map(x => x.summary) || [];
+    const listOfSummaries = Object.keys(interactions(data).reduce((acc, x) => {
+        acc[x.summary] = true;
+        return acc;
+    }, {})).sort((a, b) => {
+        return a.length - b.length;
+    });
 
     let listOfCompanies = companies(data, filter);
     if (listOfCompanies.length === 0) {
@@ -873,11 +878,11 @@ const addInteraction = async (data, filter) => {
             message: '',
         }),
         suggest: (input, choices) => {
-            const ilc = input.toLowerCase();
+            const inputLowerCase = input.toLowerCase();
             return choices.filter(choice =>
                 choice.value === 'new_summary'
                 && (newSummary = choice.message = input)
-                || choice.message.toLowerCase().startsWith(ilc));
+                || choice.message.toLowerCase().startsWith(inputLowerCase));
         },
     }]));
     await doYouConfirm();
