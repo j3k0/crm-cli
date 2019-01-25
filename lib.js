@@ -388,6 +388,8 @@ const followups = (data, filter, delColumns) => {
         });
         out = fuse.search(filter);
     }
+    // Ignore bots
+    out = out.filter((i) => i.company.indexOf('[BOT]') < 0);
     // Only keep what's due in less than 3 days
     out = out.filter((i) => ((+new Date(i.date) - 3 * 24 * 3600000) - (+new Date()) < 0));
     out = out.sort((a, b) => (+new Date(b.date)) - (+new Date(a.date)));
