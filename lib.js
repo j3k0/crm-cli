@@ -869,6 +869,10 @@ const addInteraction = async (data, filter) => {
         limit: 10
     }, {
         type: 'input',
+        name: 'date',
+        message: 'Date',
+    }, {
+        type: 'input',
         name: 'followUpDate',
         message: 'Follow-Up Date',
     }, {
