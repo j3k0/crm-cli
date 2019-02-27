@@ -793,11 +793,12 @@ const addInteraction = async (data, filter) => {
     console.log('New Interaction:');
     console.log('----------------');
 
+    const sumCount = {};
     const listOfSummaries = Object.keys(interactions(data).reduce((acc, x) => {
-        acc[x.summary] = true;
+        acc[x.summary] = (acc[x.summary] || 0) + 1;
         return acc;
-    }, {})).sort((a, b) => {
-        return a.length - b.length;
+    }, sumCount)).sort((a, b) => {
+        return sumCount[b] - sumCount[a]; // length - b.length;
     });
 
     let listOfCompanies = companies(data, filter);
