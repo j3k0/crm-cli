@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 const crm = require('./lib');
+const package = require('./package.json');
 
 const help = () => {
     console.log(
@@ -42,7 +43,13 @@ Available commands:
 `);
 };
 
+const version = () => {
+    console.log(package.version);
+};
+
 const commands = {
+    v: version,
+    version: version,
     i: crm.interactions.query,
     int: crm.interactions.query,
     interactions: crm.interactions.query,
@@ -74,6 +81,12 @@ const commands = {
     'template-help': crm.templates.help,
     template: crm.templates.run,
 };
+
+// Make sure --<command> and -<command> work too
+Object.keys(commands).forEach((key) => {
+    commands[`-${key}`] = commands[key];
+    commands[`--${key}`] = commands[key];
+});
 
 if (process.argv[2] === 'init-crm') {
     crm.data.initSync();
