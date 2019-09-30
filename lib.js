@@ -1183,7 +1183,7 @@ module.exports = {
         edit: editContact,
         add: addContact,
         find: findContact,
-        qurery: contacts,
+        query: contacts,
     },
     followups: {
         done: doneInteraction,
