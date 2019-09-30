@@ -78,9 +78,29 @@ async function editJson (data) {
 //
 //
 
-const defaultTableOptions = {
+const defaultTableOptions = process.env.CSV ? {
+    chars: {
+        'top': '' , 'top-mid': '' , 'top-left': '' , 'top-right': '',
+        'bottom': '' , 'bottom-mid': '' , 'bottom-left': '' , 'bottom-right': '',
+        'left': '' , 'left-mid': '' , 'mid': '' , 'mid-mid': '',
+        'right': '' , 'right-mid': '' ,
+        'middle': ','
+    },
+    style: {
+        'padding-left': 0,
+        'padding-right': 0,
+        border: [], head: [], compact: true
+    }
+} : {
     chars: {'mid': '', 'left-mid': '', 'mid-mid': '', 'right-mid': ''}
 };
+
+const tableToString = (table) => {
+    if (process.env.CSV)
+        return table.toString().replace(/ +/g, ' ').replace(/ ,/g, ',');
+    else
+        return table.toString();
+}
 
 const fieldToText = (object, field) =>
     ['date', 'created', 'upgraded', 'churned', 'followup'].indexOf(field) >= 0
@@ -170,7 +190,7 @@ const companies = (data, filter, delColumns) => {
             defaultTableOptions));
         out.forEach((company) =>
             table.push(displayColumns.map(cname => fieldToText(company, cname))));
-        console.log(table.toString());
+        console.log(tableToString(table));
     };
     return out;
 };
@@ -212,7 +232,7 @@ const about = (data, filter, delColumns) => {
             table.push(displayColumns.map(cname => fieldToText(line, cname)));
         });
         console.log('\nContacts:');
-        console.log(table.toString());
+        console.log(tableToString(table));
         Object.keys(companies).forEach((company) => {
             console.log(`\nApps from ${company}:`);
             apps(data, company, ['company']).printAsText();
@@ -257,7 +277,7 @@ const contacts = (data, filter, delColumns) => {
             defaultTableOptions));
         out.forEach((line) =>
             table.push(displayColumns.map(cname => fieldToText(line, cname))));
-        console.log(table.toString());
+        console.log(tableToString(table));
     };
     return out;
 };
@@ -298,7 +318,7 @@ const apps = (data, filter, delColumns) => {
             defaultTableOptions));
         out.forEach((line) =>
             table.push(displayColumns.map(cname => fieldToText(line, cname))));
-        console.log(table.toString());
+        console.log(tableToString(table));
     };
     return out;
 };
@@ -399,7 +419,7 @@ const followups = (data, filter, delColumns) => {
             defaultTableOptions));
         out.forEach((line) =>
             table.push(displayColumns.map(cname => fieldToText(line, cname))));
-        console.log(table.toString());
+        console.log(tableToString(table));
     };
     return out;
 };
@@ -477,7 +497,7 @@ const interactions = (data, filter, delColumns) => {
             defaultTableOptions));
         out.forEach((line) =>
             table.push(displayColumns.map(cname => fieldToText(line, cname))));
-        console.log(table.toString());
+        console.log(tableToString(table));
     };
     return out;
 };
