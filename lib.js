@@ -185,7 +185,7 @@ const about = (data, filter, delColumns) => {
             out.push({
                 company: company.name,
                 role: c.role,
-                email: `${name} <${c.email}>`,
+                email: name ? `"${name}" <${c.email}>` : c.email,
             });
         });
     });
@@ -234,7 +234,7 @@ const contacts = (data, filter, delColumns) => {
             out.push({
                 company: company.name,
                 role: c.role,
-                email: `${name} <${c.email}>`,
+                email: name ? `"${name}" <${c.email}>` : c.email,
                 rawEmail: c.email,
             });
         });
@@ -312,7 +312,7 @@ class Company {
         const fromContact = this.contacts.reduce((acc, c) => {
             const name = `${c.firstName} ${c.lastName}`.replace(/(^ )|( $)/g, '');
             if (name)
-                return `${name} <${c.email}>`;
+                return `"${name}" <${c.email}>`;
             else if (c.email)
                 return c.email;
             else
@@ -563,7 +563,7 @@ const template = async (data, arg) => {
         const friendlyName = contact.firstName || defaultName;
         const name = `${contact.firstName} ${contact.lastName}`.replace(/(^ )|( $)/g, '') || defaultName;
         content = content.replace(new RegExp('{{EMAIL}}', 'g'), `${contact.email}`);
-        content = content.replace(new RegExp('{{FULL_EMAIL}}', 'g'), `${name} <${contact.email}>`);
+        content = content.replace(new RegExp('{{FULL_EMAIL}}', 'g'), `"${name}" <${contact.email}>`);
         content = content.replace(new RegExp('{{FULL_NAME}}', 'g'), name);
         content = content.replace(new RegExp('{{NAME}}', 'g'), name);
         content = content.replace(new RegExp('{{FRIENDLY_NAME}}', 'g'), friendlyName);
