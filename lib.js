@@ -375,6 +375,7 @@ const followups = (data, filter, delColumns) => {
             });
         }
         // Follow-up after subscription
+        /*
         if (!company.hasInteraction('subscription')) {
             company.apps.forEach((app) => {
                 if (app.upgradedAt) {
@@ -388,6 +389,7 @@ const followups = (data, filter, delColumns) => {
                 }
             });
         }
+        */
         company.interactions.map((i) => ({
             id: id++,
             company: company.name,
