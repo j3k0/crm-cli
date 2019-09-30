@@ -40,6 +40,11 @@ Available commands:
 
     init-crm ........ create data file in current directory.
 
+
+Customize output with environment variables:
+
+  CSV=1 ............... output tables in pseudo csv.
+
 `);
 };
 
