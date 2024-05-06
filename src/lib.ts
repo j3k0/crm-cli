@@ -1,16 +1,80 @@
-const fs = require('fs');
-const dataDir = process.cwd(); // 'data';
-const dataFile = 'crm.json';
-const Table = require('cli-table');
-const Fuse = require('fuse.js');
-const moment = require('moment');
-const enquirer = require('enquirer');
-const tmp = require('tmp');
+
+// directory where the data file is stored
+const dataDir = process.env.DATA_DIR || process.cwd();
+
+// name of the data file
+const dataFile = process.env.DATA_FILE || 'crm.json';
+
+import * as fs from 'fs';
+import Table from 'cli-table';
+import Fuse, { FuseOptions } from 'fuse.js';
+import moment from 'moment';
+import enquirer from 'enquirer';
+import * as tmp from 'tmp';
 tmp.setGracefulCleanup();
 
-const STAFF = {'hoelt@fovea.cc': 'jc'};
-const KINDS = ['email', 'github', 'contact-form', 'phone', 'real-life', 'linkedin', 'none'];
-const TAGS = ['registration', 'subscription', 'bug', 'question'];
+type InteractionKind =
+    | 'system'
+    | 'email'
+    | 'github'
+    | 'contact-form'
+    | 'phone'
+    | 'real-life'
+    | 'linkedin'
+    | 'none'
+;
+
+const STAFF: { [email: string]: string } = { 'hoelt@fovea.cc': 'jc' };
+const KINDS: InteractionKind[] = ['email', 'github', 'contact-form', 'phone', 'real-life', 'linkedin', 'none'];
+const TAGS: string[] = ['registration', 'subscription', 'bug', 'question'];
+
+type Database = {
+    companies: Company[];
+    subscriptionPlans: string[];
+}
+
+interface CompanyAttributes {
+    createdAt?: string;
+    updatedAt?: string;
+    name: string;
+    address?: string;
+    url: string;
+    contacts: Contact[];
+    apps: App[];
+    interactions: Interaction[];
+    noFollowUp?: boolean;
+}
+
+interface Contact {
+    firstName?: string;
+    lastName?: string;
+    role?: string;
+    email: string;
+    linkedin?: string;
+    github?: string;
+    url?: string;
+    twitter?: string;
+    createdAt?: string;
+    updatedAt?: string;
+}
+interface App {
+    appName: string;
+    plan: string;
+    email: string;
+    createdAt: string;
+    updatedAt: string;
+    upgradedAt?: string;
+    churnedAt?: string;
+}
+interface Interaction {
+    kind: InteractionKind;
+    from: string;
+    summary: string;
+    date: string; // ISODate
+    updatedAt?: string; // ISODate
+    tag?: string;
+    followUpDate?: string;
+}
 
 //
 //
@@ -18,23 +82,23 @@ const TAGS = ['registration', 'subscription', 'bug', 'question'];
 
 const spawn = require('child_process').spawn;
 
-function editFile (file) {
+function editFile(file: string): Promise<{ exitCode: number; signal: string }> {
     return new Promise((resolve, reject) => {
         const ed = /^win/.test(process.platform) ? 'notepad' : 'vim';
         const editor = process.env.VISUAL || process.env.EDITOR || ed;
         const args = editor.split(/\s+/);
         const bin = args.shift();
         const ps = spawn(bin, args.concat([file]), { stdio: 'inherit' });
-        ps.on('exit', (exitCode, signal) => {
-            resolve({exitCode, signal});
+        ps.on('exit', (exitCode: number, signal: string) => {
+            resolve({ exitCode, signal });
         });
-        ps.on('error', (err) => {
+        ps.on('error', (err: any) => {
             reject(err.code === 'ENOENT' ? 127 : 1);
         });
     });
 }
 
-async function editData (data) {
+async function editData (data: string) {
     const tmpobj = tmp.fileSync({prefix: 'crm-', postfix: '.json'});
     // write to file
     fs.writeFileSync(tmpobj.name, data);
@@ -46,7 +110,7 @@ async function editData (data) {
     return content;
 }
 
-async function editJson (data) {
+async function editJson<T extends object> (data: T) {
     let ret = await editData(JSON.stringify(data, null, 4));
     while (true) {
         try {
@@ -56,7 +120,7 @@ async function editJson (data) {
             const action = await enquirer.prompt({
                 type: 'autocomplete',
                 name: 'value',
-                message: 'Invalid JSON: ' + e.message,
+                message: 'Invalid JSON: ' + (e as Error).message,
                 choices: [{
                     message: 'Keep Editing',
                     value: 'edit'
@@ -95,84 +159,109 @@ const defaultTableOptions = process.env.CSV ? {
     chars: {'mid': '', 'left-mid': '', 'mid-mid': '', 'right-mid': ''}
 };
 
-const tableToString = (table) => {
+const tableToString = (table: Table) => {
     if (process.env.CSV)
         return table.toString().replace(/ +/g, ' ').replace(/ ,/g, ',');
     else
         return table.toString();
 }
 
-const fieldToText = (object, field) =>
-    ['date', 'created', 'upgraded', 'churned', 'followup'].indexOf(field) >= 0
+function fieldToText (object: any, field: string): string {
+    return ['date', 'created', 'upgraded', 'churned', 'followup'].indexOf(field) >= 0
         ? (object[field] && moment(new Date(object[field])).fromNow() || '')
         : field === 'from'
         ? STAFF[object.from] || object.from.split(/[@.]/)[0]
         : (object[field] || '');
+}
 
 // const loadData = () =>
 //     fs.readdirSync(dataDir).map((file) => require('./' + dataDir + '/' + file));
 
-const loadDataSync = () => {
-    if (fs.existsSync(`${dataDir}/${dataFile}`))
-        return require(`${dataDir}/${dataFile}`);
+const loadDataSync = (): Database => {
+    if (fs.existsSync(`${dataDir}/${dataFile}`)) {
+        const data = require(`${dataDir}/${dataFile}`);
+        if (Array.isArray(data)) {
+            return {
+                companies: data,
+                subscriptionPlans: ['free', 'silver', 'gold'],
+            }
+        }
+        else {
+            return data as Database;
+        }
+    }
     else {
         console.error(`ERROR: File ${dataDir}/${dataFile} not found.`);
         console.error(`Run "crm init-crm" and I'll create it for you.`);
         process.exit(1);
     }
 };
-const saveDataSync = (data) => {
+const saveDataSync = (data: Database) => {
     fs.copyFileSync(`${dataDir}/${dataFile}`, `${dataDir}/${dataFile}.bak`);
     fs.writeFileSync(`${dataDir}/${dataFile}`, JSON.stringify(data, null, 4));
 };
 const initDataSync = () => {
-    fs.writeFileSync(`${dataDir}/${dataFile}`, JSON.stringify([], null, 4));
+    fs.writeFileSync(`${dataDir}/${dataFile}`, JSON.stringify(emptyDatabase(), null, 4));
 };
 
-// Requests
-const allContacts = (data) =>
-    data.reduce((acc, company) => company.contacts.reduce((acc, contact) =>
-        acc.push(contact) && acc, acc), []);
-const allApps = (data) =>
-    data.reduce((acc, company) => company.apps.reduce((acc, app) =>
-        acc.push(app) && acc, acc), []);
+function emptyDatabase(): Database {
+    return {
+        companies: [],
+        subscriptionPlans: ['free', 'silver', 'gold'],
+    }
+}
 
-const fuseFind = (keys, data, search) =>
-    (new Fuse(data,
-        Object.assign({
+// Requests
+const allContacts = (data: Database) =>
+    data.companies.reduce((acc: Contact[], company: CompanyAttributes) => {
+        company.contacts.forEach((contact: Contact) => acc.push(contact));
+        return acc;
+     }, [] as Contact[]);
+const allApps = (data: Database) =>
+    data.companies.reduce(function (acc, company) {
+        company.apps.forEach((app) => acc.push(app));
+        return acc;
+    }, [] as App[]);
+
+function fuseFind<T> (keys: (keyof T)[], data: readonly T[], search?: string): T | undefined {
+    if (!search) return;
+    return (new Fuse(data,
+        {
             matchAllTokens: true,
             threshold: 0.1,
             location: 0,
             distance: 100,
             findAllMatches: true,
-            limit: 1,
-        }, {keys})))
+            // limit: 1,
+            keys,
+        }))
         .search(search)[0];
+}
 
-const findContact = (data, search) =>
+const findContact = (data: Database, search: string | undefined) =>
     fuseFind(['firstName', 'lastName', 'email'], allContacts(data), search);
 
-const findCompany = (data, search) =>
-    fuseFind(['name'], data, search);
+const findCompany = (data: Database, search: string | undefined) =>
+    fuseFind(['name'], data.companies, search);
 
-const findApp = (data, search) =>
+const findApp = (data: Database, search: string | undefined) =>
     fuseFind(['appName', 'email'], allApps(data), search);
 
-const findInteraction = (data, index) => {
-    index = index|0;
+const findInteraction = (data: Database, indexAsString: string) => {
+    const index = parseInt(indexAsString) | 0;
     let id = 1;
-    for (const company of data)
+    for (const company of data.companies)
         for (const interaction of company.interactions)
             if (id++ === index)
                 return interaction;
-    return null;
+    return undefined;
 };
 
 // Reports
-const companies = (data, filter, delColumns) => {
-    const columns = ['name', 'url', 'address'];
+const companies = (data: Database, filter?: string, delColumns?: (keyof CompanyAttributes)[]): PrintableArray<Company> => {
+    const columns: (keyof CompanyAttributes)[] = ['name', 'url', 'address'];
     const displayColumns = columns.filter((c) => !delColumns || delColumns.indexOf(c) < 0);
-    let out = data.map(x => x);
+    let out = data.companies.map(x => x);
     if (filter) {
         const fuse = new Fuse(out, {
             keys: columns,
@@ -184,22 +273,31 @@ const companies = (data, filter, delColumns) => {
         });
         out = fuse.search(filter);
     }
-    out.printAsText = () => {
-        const table = new Table(Object.assign(
-            {head: displayColumns},
-            defaultTableOptions));
-        out.forEach((company) =>
-            table.push(displayColumns.map(cname => fieldToText(company, cname))));
-        console.log(tableToString(table));
-    };
-    return out;
+    return {
+        content: out,
+        printAsText: () => {
+            const table = new Table(Object.assign(
+                { head: displayColumns },
+                defaultTableOptions));
+            out.forEach((company) =>
+                table.push(displayColumns.map(cname => fieldToText(company, cname))));
+            console.log(tableToString(table));
+        }
+    }
 };
 
-const about = (data, filter, delColumns) => {
-    let out = [];
-    const columns = ['company', 'role', 'email'];
+
+interface About {
+    company: string;
+    role?: string;
+    email: string;
+}
+
+const about = (data: Database, filter: string, delColumns: (keyof About)[]) => {
+    let out: About[] = [];
+    const columns: (keyof About)[] = ['company', 'role', 'email'];
     const displayColumns = columns.filter((c) => !delColumns || delColumns.indexOf(c) < 0);
-    data.forEach((company) => {
+    data.companies.forEach((company) => {
         company.contacts.forEach((c) => {
             const name = `${c.firstName} ${c.lastName}`.replace(/(^ )|( $)/g, '');
             out.push({
@@ -221,42 +319,55 @@ const about = (data, filter, delColumns) => {
         out = fuse.search(filter);
     }
 
-    out.printAsText = () => {
+    return {
+        ...out,
+        printAsText: () => {
 
-        const table = new Table( Object.assign(
-            {head: displayColumns},
-            defaultTableOptions));
-        const companies = {};
-        out.forEach((line) => {
-            companies[line.company] = true;
-            table.push(displayColumns.map(cname => fieldToText(line, cname)));
-        });
-        console.log('\nContacts:');
-        console.log(tableToString(table));
-        Object.keys(companies).forEach((company) => {
-            console.log(`\nApps from ${company}:`);
-            apps(data, company, ['company']).printAsText();
-            console.log(`\nInteractions with ${company}:`);
-            interactions(data, company, ['company']).printAsText();
-        });
+            const table = new Table(Object.assign(
+                { head: displayColumns },
+                defaultTableOptions));
+            const companies: {[companyName: string]: boolean} = {};
+            out.forEach((line) => {
+                companies[line.company] = true;
+                table.push(displayColumns.map(cname => fieldToText(line, cname)));
+            });
+            console.log('\nContacts:');
+            console.log(tableToString(table));
+            Object.keys(companies).forEach((company) => {
+                console.log(`\nApps from ${company}:`);
+                apps(data, company, ['company']).printAsText();
+                console.log(`\nInteractions with ${company}:`);
+                interactions(data, company, ['company']).printAsText();
+            });
+        }
     };
-    return out;
 };
 
 
-const contacts = (data, filter, delColumns) => {
-    let out = [];
-    const columns = ['company', 'role', 'email'];
+interface ContactsResult {
+    company: Company["name"];
+    role: Contact["role"];
+    email: string;
+    rawEmail: Contact["email"];
+}
+
+function makeContactsResult(c: Contact, company: CompanyAttributes): ContactsResult {
+    const name = `${c.firstName} ${c.lastName}`.replace(/(^ )|( $)/g, '');
+    return {
+        company: company.name,
+        role: c.role,
+        email: name ? `"${name}" <${c.email}>` : c.email,
+        rawEmail: c.email,
+    }
+}
+
+const contacts = (data: Database, filter?: string, delColumns?: (keyof ContactsResult)[]): PrintableArray<ContactsResult> => {
+    let out: ContactsResult[] = [];
+    const columns: (keyof ContactsResult)[] = ['company', 'role', 'email'];
     const displayColumns = columns.filter((c) => !delColumns || delColumns.indexOf(c) < 0);
-    data.forEach((company) => {
+    data.companies.forEach((company) => {
         company.contacts.forEach((c) => {
-            const name = `${c.firstName} ${c.lastName}`.replace(/(^ )|( $)/g, '');
-            out.push({
-                company: company.name,
-                role: c.role,
-                email: name ? `"${name}" <${c.email}>` : c.email,
-                rawEmail: c.email,
-            });
+            out.push(makeContactsResult(c, company));
         });
     });
     if (filter) {
@@ -271,22 +382,34 @@ const contacts = (data, filter, delColumns) => {
         out = fuse.search(filter);
     }
 
-    out.printAsText = () => {
-        const table = new Table( Object.assign(
-            {head: displayColumns},
-            defaultTableOptions));
-        out.forEach((line) =>
-            table.push(displayColumns.map(cname => fieldToText(line, cname))));
-        console.log(tableToString(table));
+    return {
+        content: out,
+        printAsText: () => {
+            const table = new Table( Object.assign(
+                {head: displayColumns},
+                defaultTableOptions));
+            out.forEach((line) =>
+                table.push(displayColumns.map(cname => fieldToText(line, cname))));
+            console.log(tableToString(table));
+        }
     };
-    return out;
 };
 
-const apps = (data, filter, delColumns) => {
-    let out = [];
-    const columns = ['company', 'plan', 'created', 'upgraded', 'churned', 'name', 'email'];
+interface AppResult {
+    company: CompanyAttributes["name"];
+    created: App["createdAt"];
+    upgraded: App["upgradedAt"];
+    churned: App["churnedAt"];
+    email: App["email"];
+    name: App["appName"];
+    plan: App["plan"];
+}
+
+const apps = (data: Database, filter?: string, delColumns?: (keyof AppResult)[]): PrintableArray<AppResult> => {
+    let out: AppResult[] = [];
+    const columns: (keyof AppResult)[] = ['company', 'plan', 'created', 'upgraded', 'churned', 'name', 'email'];
     const displayColumns = columns.filter((c) => !delColumns || delColumns.indexOf(c) < 0);
-    data.forEach((company) => {
+    data.companies.forEach((company) => {
         company.apps.forEach((app) => {
             out.push({
                 company: company.name,
@@ -310,22 +433,44 @@ const apps = (data, filter, delColumns) => {
         });
         out = fuse.search(filter);
     }
-    out = out.sort((a, b) => (+new Date(a.date)) - (+new Date(b.date)));
+    out = out.sort((a, b) => (+new Date(a.created)) - (+new Date(b.created)));
 
-    out.printAsText = () => {
-        const table = new Table( Object.assign(
-            {head: displayColumns},
-            defaultTableOptions));
-        out.forEach((line) =>
-            table.push(displayColumns.map(cname => fieldToText(line, cname))));
-        console.log(tableToString(table));
+    return {
+        content: out,
+        printAsText: () => {
+            const table = new Table( Object.assign(
+                {head: displayColumns},
+                defaultTableOptions));
+            out.forEach((line) =>
+                table.push(displayColumns.map(cname => fieldToText(line, cname))));
+            console.log(tableToString(table));
+        }
     };
-    return out;
 };
 
-class Company {
-    constructor (data) {
+class Company implements CompanyAttributes {
+
+    createdAt?: string;
+    updatedAt?: string;
+    name: string;
+    address?: string;
+    url: string;
+    contacts: Contact[];
+    apps: App[];
+    interactions: Interaction[];
+    noFollowUp?: boolean;
+
+    constructor(data: CompanyAttributes) {
         Object.assign(this, data);
+        this.name = data.name;
+        this.address = data.address;
+        this.url = data.url;
+        this.contacts = data.contacts;
+        this.apps = data.apps;
+        this.interactions = data.interactions;
+        this.noFollowUp = data.noFollowUp;
+        this.createdAt = data.createdAt;
+        this.updatedAt = data.updatedAt;
     }
 
     get email () {
@@ -345,7 +490,7 @@ class Company {
         return fromApp;
     }
 
-    hasInteraction (summary) {
+    hasInteraction (summary: string) {
         const s = summary.toLowerCase();
         return this.interactions
             .filter((i) => i.summary.toLowerCase().indexOf(s) >= 0
@@ -354,12 +499,30 @@ class Company {
     }
 }
 
-const followups = (data, filter, delColumns) => {
-    let out = [];
-    const columns = ['id', 'company', 'date', 'tag', 'summary', 'email'];
+interface FollowUpsResult {
+    id?: number;
+    company: string;
+    email: string;
+    tag?: string;
+    summary: string;
+    date: string;
+}
+
+interface Printable {
+    printAsText: () => void;
+}
+
+interface PrintableArray<T> {
+    content: T[];
+    printAsText: () => void;
+}
+
+const followups = (data: Database, filter: string, delColumns: (keyof FollowUpsResult)[]): PrintableArray<FollowUpsResult> => {
+    let out: FollowUpsResult[] = [];
+    const columns: (keyof FollowUpsResult)[] = ['id', 'company', 'date', 'tag', 'summary', 'email'];
     const displayColumns = columns.filter((c) => !delColumns || delColumns.indexOf(c) < 0);
     let id = 1;
-    data.forEach((companyData) => {
+    data.companies.forEach((companyData) => {
         const company = new Company(companyData);
         if (company.noFollowUp) return;
         // Follow-up 3 days after registration
@@ -397,7 +560,7 @@ const followups = (data, filter, delColumns) => {
             tag: i.tag,
             summary: i.summary,
             date: i.followUpDate
-        })).filter((i) => i.date).forEach((i) => out.push(i));
+        })).filter(i => !!i.date).forEach((i) => out.push(i as FollowUpsResult));
     });
     if (filter) {
         const fuse = new Fuse(out, {
@@ -415,30 +578,44 @@ const followups = (data, filter, delColumns) => {
     // Only keep what's due in less than 3 days
     out = out.filter((i) => ((+new Date(i.date) - 3 * 24 * 3600000) - (+new Date()) < 0));
     out = out.sort((a, b) => (+new Date(b.date)) - (+new Date(a.date)));
-    out.printAsText = () => {
-        const table = new Table( Object.assign(
-            {head: displayColumns},
-            defaultTableOptions));
-        out.forEach((line) =>
-            table.push(displayColumns.map(cname => fieldToText(line, cname))));
-        console.log(tableToString(table));
+    return {
+        content: out,
+        printAsText: () => {
+            const table = new Table( Object.assign(
+                {head: displayColumns},
+                defaultTableOptions));
+            out.forEach((line) =>
+                table.push(displayColumns.map(cname => fieldToText(line, cname))));
+            console.log(tableToString(table));
+        },
     };
-    return out;
 };
 
-const interactionId = (companyName, date, summary) =>
-    md5(`${companyName}:${date}:${summary}`).slice(0, 4);
+// const interactionId = (companyName: string, date: string, summary: string) =>
+//     md5(`${companyName}:${date}:${summary}`).slice(0, 4);
 
-const interactions = (data, filter, delColumns) => {
-    let out = [];
-    const columns = ['id', 'company', 'kind', 'date', 'from', 'summary', 'followup'];
+interface InteractionsResult {
+    id?: number;
+    company: Company["name"];
+    kind: InteractionKind;
+    date: App["createdAt"] | '';
+    from: string;
+    summary: string;
+    followup: string;
+}
+
+const interactions = (data: Database, filter?: string, delColumns?: (keyof InteractionsResult)[]): PrintableArray<InteractionsResult> => {
+    let out: InteractionsResult[] = [];
+    const columns: (keyof InteractionsResult)[] = ['id', 'company', 'kind', 'date', 'from', 'summary', 'followup'];
     const displayColumns = columns.filter((c) => !delColumns || delColumns.indexOf(c) < 0);
     let id = 1;
-    function pushWithId(data) {
-        data.id = id++; // interactionId(data.company, data.date, 'registration');
-        out.push(data);
+    function pushWithId(data: Omit<InteractionsResult, "id">) {
+        out.push({
+            ...data,
+            id: id++
+        });
     }
-    data.forEach((company) => {
+    data.companies.forEach((company) => {
         company.apps.forEach((app) => {
             out.push({
                 company: company.name,
@@ -493,18 +670,20 @@ const interactions = (data, filter, delColumns) => {
     }
     out = out.sort((a, b) => (+new Date(a.date)) - (+new Date(b.date)));
 
-    out.printAsText = () => {
-        const table = new Table( Object.assign(
-            {head: displayColumns},
-            defaultTableOptions));
-        out.forEach((line) =>
-            table.push(displayColumns.map(cname => fieldToText(line, cname))));
-        console.log(tableToString(table));
+    return {
+        content: out,
+        printAsText: () => {
+            const table = new Table( Object.assign(
+                {head: displayColumns},
+                defaultTableOptions));
+            out.forEach((line) =>
+                table.push(displayColumns.map(cname => fieldToText(line, cname))));
+            console.log(tableToString(table));
+        }
     };
-    return out;
 };
 
-const templateHelp = async (data, arg) => {
+const templateHelp = async (data: Database, arg: string) => {
     return { printAsText: () => console.log(`
 Here are the available template fields.
 
@@ -526,7 +705,7 @@ Here are the available template fields.
     `) };
 };
 
-const template = async (data, arg) => {
+const template = async (data: Database, arg: string) => {
     const [fileName, ...filterArray] = arg.split(' ');
     const filter = filterArray.join(' ');
     if (!fileName || !filter)
@@ -535,41 +714,45 @@ const template = async (data, arg) => {
         throw `ERROR: ${fileName} does not exists.`;
     let content = fs.readFileSync(fileName, {encoding:'utf-8'});
 
-    let app = apps(data, filter);
-    let contact = contacts(data, filter);
-    let company = companies(data, filter);
+    const filteredApp: AppResult[] = apps(data, filter).content;
+    const filteredContact: ContactsResult[] = contacts(data, filter).content;
+    const filteredCompany: Company[] = companies(data, filter).content;
+
+    let app: App | undefined;
+    let contact: Contact | undefined;
+    let company: Company | undefined;
 
     // If any results are non-ambiguous
-    if (app && app.length === 1) {
-        contact = findContact(data, app[0].email);
-        company = findCompany(data, app[0].company);
-        app = findApp(data, app[0].email);
+    if (filteredApp && filteredApp.length === 1) {
+        contact = findContact(data, filteredApp[0].email);
+        company = findCompany(data, filteredApp[0].company);
+        app = findApp(data, filteredApp[0].email);
     }
-    else if (contact && contact.length === 1) {
-        app = findApp(data, contact[0].company);
-        company = findCompany(data, contact[0].company);
-        contact = findContact(data, contact[0].email);
+    else if (filteredContact && filteredContact.length === 1) {
+        app = findApp(data, filteredContact[0].company);
+        company = findCompany(data, filteredContact[0].company);
+        contact = findContact(data, filteredContact[0].email);
     }
-    else if (company && company.length === 1) {
-        app = findApp(data, company[0].name);
-        contact = findContact(data, company[0].name);
-        company = findCompany(data, company[0].name);
+    else if (filteredCompany && filteredCompany.length === 1) {
+        app = findApp(data, filteredCompany[0].name);
+        contact = findContact(data, filteredCompany[0].name);
+        company = findCompany(data, filteredCompany[0].name);
     }
     // If some results are ambiguous, pick app, or contact, or company
-    else if (app && app.length > 1) {
-        contact = findContact(data, app[0].email);
-        company = findCompany(data, app[0].company);
-        app = findApp(data, app[0].email);
+    else if (filteredApp && filteredApp.length > 1) {
+        contact = findContact(data, filteredApp[0].email);
+        company = findCompany(data, filteredApp[0].company);
+        app = findApp(data, filteredApp[0].email);
     }
-    else if (contact && contact.length > 1) {
-        app = findApp(data, contact[0].company);
-        company = findCompany(data, contact[0].company);
-        contact = findContact(data, contact[0].email);
+    else if (filteredContact && filteredContact.length > 1) {
+        app = findApp(data, filteredContact[0].company);
+        company = findCompany(data, filteredContact[0].company);
+        contact = findContact(data, filteredContact[0].email);
     }
-    else if (company && company.length > 1) {
-        app = findApp(data, company[0].name);
-        contact = findContact(data, company[0].name);
-        company = findCompany(data, company[0].name);
+    else if (filteredCompany && filteredCompany.length > 1) {
+        app = findApp(data, filteredCompany[0].name);
+        contact = findContact(data, filteredCompany[0].name);
+        company = findCompany(data, filteredCompany[0].name);
     }
     // Else, no result
     else {
@@ -581,7 +764,7 @@ const template = async (data, arg) => {
     }
 
     if (contact) {
-        const defaultName = company.name || app.appName || 'user'
+        const defaultName = company?.name || app?.appName || 'user';
         const friendlyName = contact.firstName || defaultName;
         const name = `${contact.firstName} ${contact.lastName}`.replace(/(^ )|( $)/g, '') || defaultName;
         content = content.replace(new RegExp('{{EMAIL}}', 'g'), `${contact.email}`);
@@ -589,26 +772,27 @@ const template = async (data, arg) => {
         content = content.replace(new RegExp('{{FULL_NAME}}', 'g'), name);
         content = content.replace(new RegExp('{{NAME}}', 'g'), name);
         content = content.replace(new RegExp('{{FRIENDLY_NAME}}', 'g'), friendlyName);
-        content = content.replace(new RegExp('{{FIRST_NAME}}', 'g'), contact.firstName);
-        content = content.replace(new RegExp('{{LAST_NAME}}', 'g'), contact.lastName);
+        content = content.replace(new RegExp('{{FIRST_NAME}}', 'g'), contact.firstName || '');
+        content = content.replace(new RegExp('{{LAST_NAME}}', 'g'), contact.lastName || '');
     }
     if (app) {
         content = content.replace(new RegExp('{{APP_NAME}}', 'g'), app.appName);
         content = content.replace(new RegExp('{{APP_PLAN}}', 'g'), app.plan);
         content = content.replace(new RegExp('{{REGISTRATION_AGO}}', 'g'), moment(new Date(app.createdAt)).fromNow());
-        content = content.replace(new RegExp('{{SUBSCRIPTION_AGO}}', 'g'), moment(new Date(app.upgradedAt)).fromNow());
+        content = content.replace(new RegExp('{{SUBSCRIPTION_AGO}}', 'g'), app.upgradedAt ? moment(new Date(app.upgradedAt)).fromNow() : '(never upgraded)');
     }
     if (company) {
-        content = content.replace(new RegExp('{{COMPANY_AGO}}', 'g'), moment(new Date(company.createdAt)).fromNow());
+        content = content.replace(new RegExp('{{COMPANY_AGO}}', 'g'), company.createdAt ? moment(new Date(company.createdAt)).fromNow() : '(unknown)');
         content = content.replace(new RegExp('{{COMPANY_NAME}}', 'g'), company.name);
         content = content.replace(new RegExp('{{COMPANY_URL}}', 'g'), company.url);
-        content = content.replace(new RegExp('{{COMPANY_ADDRESS}}', 'g'), company.address);
+        content = content.replace(new RegExp('{{COMPANY_ADDRESS}}', 'g'), company.address || '');
     }
     return {
         printAsText: () => console.log(content)
     };
 };
 
+/*
 const readColumns = async (columns) => {
     const r = await enquirer.prompt(columns.map((c) => ({
         type: 'input',
@@ -625,6 +809,7 @@ const readColumns = async (columns) => {
         return r;
     throw 'Canceled';
 };
+*/
 
 /*
 const readColumns = async (columns) => new Promise((resolve, reject) => {
@@ -664,7 +849,12 @@ const readColumns = async (columns) => new Promise((resolve, reject) => {
 });
 */
 
-const addApp = async (data, filter, values = {}) => {
+interface Choice {
+    message: string;
+    value: string;
+}
+
+const addApp = async (data: Database, filter: string, values: Partial<App & {company?: string}> = {}) => {
     console.log('');
     console.log('New App:');
     console.log('--------');
@@ -677,17 +867,17 @@ const addApp = async (data, filter, values = {}) => {
         type: 'autocomplete',
         name: 'company',
         message: 'Company Name',
-        choices: [{
+        choices: ([{
             message: 'New Company',
             value: 'new_company',
-        }].concat(data.map((c) => c.name)),
+        }] as (Choice | string)[]).concat(data.companies.map((c) => c.name)),
         limit: 10,
         initial: values.company,
     }, {
         type: 'select',
         name: 'plan',
         message: 'Plan',
-        choices: ['free', 'silver', 'gold'],
+        choices: data.subscriptionPlans,
         initial: values.plan,
     }]);
     
@@ -695,7 +885,7 @@ const addApp = async (data, filter, values = {}) => {
         type: 'autocomplete',
         name: 'email',
         message: 'Contact',
-        choices: data
+        choices: data.companies
             .filter(c => app.company === c.name)
             .reduce((acc, company) =>
                 company.contacts.reduce((acc, c) => {
@@ -752,8 +942,8 @@ const addApp = async (data, filter, values = {}) => {
     return app;
 };
 
-const addContact = async (data, filter, values = {}) => {
-    let contact = Object.assign({}, values);
+const addContact = async (data: Database, filter: string | undefined, values: Partial<Contact & { company: string }> = {}): Promise<Contact & Printable> => {
+    let contact: Partial<Contact & { company: string } & Printable> = { ...values };
     console.log('');
     console.log('New Contact:');
     console.log('------------');
@@ -761,7 +951,7 @@ const addContact = async (data, filter, values = {}) => {
         type: 'autocomplete',
         name: 'company',
         message: 'Company Name',
-        choices: data.map((c) => c.name),
+        choices: data.companies.map((c) => c.name),
         limit: 10,
     }));
     if (!values.firstName) Object.assign(contact, await enquirer.prompt({
@@ -787,7 +977,7 @@ const addContact = async (data, filter, values = {}) => {
     await doYouConfirm();
     // If name is filled and there isn't a company with the given name.
     // Add it and save
-    const companyName = contact.company;
+    const companyName = values.company;
     const company = findCompany(data, companyName); // fuzzy search for the company
     delete contact.company;
     if (company) {
@@ -796,7 +986,7 @@ const addContact = async (data, filter, values = {}) => {
         contact.firstName = contact.firstName || '';
         contact.lastName = contact.lastName || '';
         // Find the company in the data
-        company.contacts.push(contact);
+        company.contacts.push(contact as Contact);
         saveDataSync(data);
         console.log('Contact added.');
         // contacts(data, company.name).printAsText();;
@@ -807,43 +997,44 @@ const addContact = async (data, filter, values = {}) => {
         process.exit(1);
     }
     contact.printAsText = () => {};
-    return contact;
+    return contact as (Contact & Printable);
 };
 
-const addInteraction = async (data, filter) => {
+const addInteraction = async (data: Database, filter: string | undefined): Promise<Interaction & Printable> => {
     console.log('');
     console.log('New Interaction:');
     console.log('----------------');
 
-    const sumCount = {};
-    const listOfSummaries = Object.keys(interactions(data).reduce((acc, x) => {
+    const sumCount: {[summary: string]: number} = {};
+    const listOfSummaries = Object.keys(interactions(data).content.reduce((acc, x) => {
         acc[x.summary] = (acc[x.summary] || 0) + 1;
         return acc;
     }, sumCount)).sort((a, b) => {
         return sumCount[b] - sumCount[a]; // length - b.length;
     });
 
-    let listOfCompanies = companies(data, filter);
+    let listOfCompanies = companies(data, filter).content;
     if (listOfCompanies.length === 0) {
-        const contact = contacts(data, filter);
+        const contact = contacts(data, filter).content;
         if (contact.length > 0)
-            listOfCompanies = companies(data, contact[0].company);
+            listOfCompanies = companies(data, contact[0].company).content;
     }
     if (listOfCompanies.length === 0) {
-        const app = apps(data, filter);
+        const app = apps(data, filter).content;
         if (app.length > 0)
-            listOfCompanies = companies(data, app[0].company);
+            listOfCompanies = companies(data, app[0].company).content;
     }
-    const newCompany = {
+    const newCompany: Choice = {
         message: 'New Company',
         value: 'new_company',
     };
-    if (listOfCompanies.length == 1)
-        listOfCompanies = listOfCompanies.concat([newCompany]);
+    let listOfChoices: (Choice | string)[] = listOfCompanies.map(c => c.name);
+    if (listOfChoices.length == 1)
+        listOfChoices = listOfChoices.concat([newCompany]);
     else
-        listOfCompanies = [newCompany].concat(listOfCompanies);
+        listOfChoices = ([newCompany] as (Choice | string)[]).concat(listOfChoices);
 
-    const interaction = await enquirer.prompt([{
+    const interaction: (Interaction & {company: string}) = await enquirer.prompt([{
         type: 'autocomplete',
         name: 'company',
         message: 'Company Name',
@@ -858,10 +1049,10 @@ const addInteraction = async (data, filter) => {
         type: 'autocomplete',
         name: 'tag',
         message: 'Tag',
-        choices: [{
+        choices: ([{
             message: '<empty>',
             value: '',
-        }].concat(TAGS),
+        }] as (Choice | string)[]).concat(TAGS),
         limit: 10,
     }, {
     }]);
@@ -872,7 +1063,7 @@ const addInteraction = async (data, filter) => {
         type: 'autocomplete',
         name: 'from',
         message: 'From',
-        choices: data
+        choices: data.companies
             .filter(c => interaction.company === c.name)
             .reduce((acc, company) =>
                 company.contacts.reduce((acc, c) => {
@@ -902,11 +1093,11 @@ const addInteraction = async (data, filter) => {
         name: 'summary',
         message: 'Summary',
         limit: 3,
-        choices: listOfSummaries.concat({
+        choices: (listOfSummaries as (string | Choice)[]).concat({
             value: 'new_summary',
             message: '',
         }),
-        suggest: (input, choices) => {
+        suggest: (input: string, choices: Choice[]) => {
             const inputLowerCase = input.toLowerCase();
             return choices.filter(choice =>
                 choice.value === 'new_summary'
@@ -915,7 +1106,7 @@ const addInteraction = async (data, filter) => {
         },
     }]));
     await doYouConfirm();
-    interaction.tag = interaction.tag.replace('<empty>', '');
+    interaction.tag = interaction.tag?.replace('<empty>', '');
 
     if (interaction.summary === 'new_summary')
         interaction.summary = newSummary;
@@ -933,7 +1124,7 @@ const addInteraction = async (data, filter) => {
     // Add it and save
     const companyName = interaction.company;
     const company = findCompany(data, companyName); // fuzzy search for the company
-    delete interaction.company;
+    delete (interaction as any).company;
     const contact = findContact(data, interaction.from);
     if (company && contact) {
         // interaction.createdAt = new Date().toISOString();
@@ -952,11 +1143,13 @@ const addInteraction = async (data, filter) => {
         console.error(`ERROR: Contact with email "${interaction.from}" doesn't exists.`);
         process.exit(1);
     }
-    interaction.printAsText = () => {};
-    return interaction;
+    return {
+        ...interaction,
+        printAsText: () => { },
+    }
 };
 
-const doYouConfirm = async (message) => {
+const doYouConfirm = async (message?: string) => {
     if (message)
         console.log(message);
     const confirm = await enquirer.prompt({
@@ -971,7 +1164,7 @@ const doYouConfirm = async (message) => {
     }
 };
 
-const editApp = async (data, filter) => {
+const editApp = async (data: Database, filter: string) => {
     if (!filter) {
         console.log('Usage: crm edit-app NAME');
         process.exit(1);
@@ -998,11 +1191,13 @@ const editApp = async (data, filter) => {
     app.updatedAt = new Date().toISOString();
     saveDataSync(data);
     console.log('Contact updated.');
-    app.printAsText = () => {};
-    return app;
+    return {
+        ...app,
+        printAsText: () => { }
+    }
 };
 
-const doneInteraction = async (data, filter) => {
+const doneInteraction = async (data: Database, filter: string) => {
     if (!filter) {
         console.log('Usage: crm done ID');
         process.exit(1);
@@ -1021,12 +1216,12 @@ const doneInteraction = async (data, filter) => {
     return { printAsText: () => {} };
 };
 
-const editInteraction = async (data, filter) => {
+const editInteraction = async (data: Database, filter: string): Promise<(Interaction | {}) & Printable> => {
     if (!filter) {
         console.log('Usage: crm edit-interaction ID');
         process.exit(1);
     }
-    let interaction;
+    let interaction: Interaction | undefined;
     if ('' + parseInt(filter) === filter) {
         interaction = findInteraction(data, filter);
         if (!interaction)
@@ -1053,13 +1248,20 @@ const editInteraction = async (data, filter) => {
         saveDataSync(data);
         console.log('Interaction updated.');
     }
-    if (!interaction)
-        interaction = {};
-    interaction.printAsText = () => {};
-    return interaction;
+    if (!interaction) {
+        return {
+            printAsText: () => {},
+        };
+    }
+    else {
+        return {
+            ...interaction,
+            printAsText: () => {},
+        };
+    }
 };
 
-const editContact = async (data, filter) => {
+const editContact = async (data: Database, filter: string): Promise<(Contact & Printable) | undefined> => {
     if (!filter) {
         console.log('Usage: crm edit-contact NAME');
         process.exit(1);
@@ -1087,11 +1289,13 @@ const editContact = async (data, filter) => {
     contact.updatedAt = new Date().toISOString();
     saveDataSync(data);
     console.log('Contact updated.');
-    contact.printAsText = () => {};
-    return contact;
+    return {
+        ...contact,
+        printAsText: () => { }
+    };
 };
 
-const editCompany = async (data, filter) => {
+const editCompany = async (data: Database, filter: string): Promise<(CompanyAttributes & Printable) | undefined> => {
     if (!filter) {
         console.log('Usage: crm edit-company NAME');
         process.exit(1);
@@ -1121,12 +1325,16 @@ const editCompany = async (data, filter) => {
     company.updatedAt = new Date().toISOString();
     saveDataSync(data);
     console.log('Company updated.');
-    company.printAsText = () => {};
-    return company;
+    return {
+        ...company,
+        printAsText: () => {}
+    }
 };
 
-const addCompany = async (data, filter, values = {}) => {
-    let company = Object.assign({}, values);
+const addCompany = async (data: Database, filter: string | undefined, values: Partial<CompanyAttributes> = {}): Promise<CompanyAttributes & Printable> => {
+    let company: Partial<CompanyAttributes> = {
+        ...values
+    };
     console.log('');
     console.log('New Company:');
     console.log('-----------');
@@ -1148,14 +1356,14 @@ const addCompany = async (data, filter, values = {}) => {
     await doYouConfirm();
     // If name is filled and there isn't a company with the given name.
     // Add it and save
-    const found = company.name && data.find((c) => c.name.toLowerCase() === company.name.toLowerCase());
+    const found = company.name && data.companies.find((c) => c.name.toLowerCase() === company.name!.toLowerCase());
     if (company.name && !found) {
         company.createdAt = new Date().toISOString();
         company.updatedAt = new Date().toISOString();
         company.contacts = [];
         company.interactions = [];
         company.apps = [];
-        data.push(company);
+        data.companies.push(new Company(company as CompanyAttributes));
         saveDataSync(data);
         console.log('Company added.');
     }
@@ -1166,8 +1374,10 @@ const addCompany = async (data, filter, values = {}) => {
     else {
         process.exit(1);
     }
-    company.printAsText = () => {};
-    return company;
+    return {
+        ...(company as CompanyAttributes),
+        printAsText: () => { },
+    }
 };
 
 module.exports = {

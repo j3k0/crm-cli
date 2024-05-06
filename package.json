@@ -2,12 +2,13 @@
   "name": "crm-cli",
   "version": "1.5.0",
   "description": "Customer Relationship Management from your Terminal",
-  "main": "lib.js",
+  "main": "build/lib.js",
   "bin": {
     "crm": "./crm"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "tsc"
   },
   "author": "Jean-Christophe Hoelt <hoelt@fovea.cc>",
   "license": "GPL",
@@ -17,5 +18,11 @@
     "fuse.js": "^3.3.0",
     "moment": "^2.22.2",
     "tmp": "0.0.33"
+  },
+  "devDependencies": {
+    "@types/cli-table": "^0.3.4",
+    "@types/node": "^20.12.8",
+    "@types/tmp": "^0.2.6",
+    "typescript": "^5.4.5"
   }
 }
