@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-const crm = require('./build/lib');
+const crmCli = require('./build/cli');
 const package = require('./package.json');
 
 const help = () => {
@@ -55,36 +55,36 @@ const version = () => {
 const commands = {
     v: version,
     version: version,
-    i: crm.interactions.query,
-    int: crm.interactions.query,
-    interactions: crm.interactions.query,
-    com: crm.companies.query,
-    company: crm.companies.query,
-    companies: crm.companies.query,
-    con: crm.contacts.query,
-    contact: crm.contacts.query,
-    contacts: crm.contacts.query,
-    a: crm.apps.query,
-    app: crm.apps.query,
-    apps: crm.apps.query,
-    f: crm.followups.query,
-    fol: crm.followups.query,
-    followup: crm.followups.query,
-    followups: crm.followups.query,
-    about: crm.about,
-    'add-company': crm.companies.add,
-    'add-contact': crm.contacts.add,
-    'add-interaction': crm.interactions.add,
-    'add-i': crm.interactions.add,
-    'add-app': crm.apps.add,
-    'edit-company': crm.companies.edit,
-    'edit-contact': crm.contacts.edit,
-    'edit-interaction': crm.interactions.edit,
-    'edit-i': crm.interactions.edit,
-    'edit-app': crm.apps.edit,
-    'done': crm.followups.done,
-    'template-help': crm.templates.help,
-    template: crm.templates.run,
+    i: crmCli.interactions.query,
+    int: crmCli.interactions.query,
+    interactions: crmCli.interactions.query,
+    com: crmCli.companies.query,
+    company: crmCli.companies.query,
+    companies: crmCli.companies.query,
+    con: crmCli.contacts.query,
+    contact: crmCli.contacts.query,
+    contacts: crmCli.contacts.query,
+    a: crmCli.apps.query,
+    app: crmCli.apps.query,
+    apps: crmCli.apps.query,
+    f: crmCli.followups.query,
+    fol: crmCli.followups.query,
+    followup: crmCli.followups.query,
+    followups: crmCli.followups.query,
+    about: crmCli.about,
+    'add-company': crmCli.companies.add,
+    'add-contact': crmCli.contacts.add,
+    'add-interaction': crmCli.interactions.add,
+    'add-i': crmCli.interactions.add,
+    'add-app': crmCli.apps.add,
+    'edit-company': crmCli.companies.edit,
+    'edit-contact': crmCli.contacts.edit,
+    'edit-interaction': crmCli.interactions.edit,
+    'edit-i': crmCli.interactions.edit,
+    'edit-app': crmCli.apps.edit,
+    'done': crmCli.followups.done,
+    'template-help': crmCli.templates.help,
+    template: crmCli.templates.run,
 };
 
 // Make sure --<command> and -<command> work too
@@ -94,12 +94,12 @@ Object.keys(commands).forEach((key) => {
 });
 
 if (process.argv[2] === 'init-crm') {
-    crm.data.initSync();
+    crmCli.data.initSync();
     console.log('Done.');
     process.exit(0);
 }
 
-const data = crm.data.loadSync();
+const data = crmCli.data.loadSync();
 const command = commands[process.argv[2]];
 if (!command) {
     help();
