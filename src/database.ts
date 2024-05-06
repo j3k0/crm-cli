@@ -32,7 +32,14 @@ export function loadDataSync(): Database {
     }
 }
 
-export function saveDataSync(data: Database) {
+export type SaveDataSelector = {
+    type: "config";
+} | {
+    type: "company";
+    name: string;
+}
+
+export function saveDataSync(data: Database, selector: SaveDataSelector) {
     fs.copyFileSync(`${dataDir}/${dataFile}`, `${dataDir}/${dataFile}.bak`);
     fs.writeFileSync(`${dataDir}/${dataFile}`, JSON.stringify(data, null, 4));
 }

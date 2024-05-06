@@ -38,11 +38,11 @@ export async function editData (data: string) {
     return content;
 }
 
-export async function editJson<T extends object> (data: T) {
+export async function editJson<T extends object> (data: T): Promise<Partial<T>> {
     let ret = await editData(JSON.stringify(data, null, 4));
     while (true) {
         try {
-            return JSON.parse(ret);
+            return JSON.parse(ret) as Partial<T>;
         }
         catch (e) {
             const action = await enquirer.prompt({

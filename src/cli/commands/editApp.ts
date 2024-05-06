@@ -1,6 +1,6 @@
 import { saveDataSync } from "../../database";
 import { findApp } from "../../queries/requests";
-import { Database } from "../../types";
+import { App, Database } from "../../types";
 import { editJson } from "../editor";
 import { doYouConfirm } from "../utils";
 
@@ -9,19 +9,17 @@ export async function editApp(data: Database, filter: string) {
       console.log('Usage: crm edit-app NAME');
       process.exit(1);
   }
-  const app = findApp(data, filter); // fuzzy search for the company
-  if (!app)
+  const findResult = findApp(data, filter); // fuzzy search for the company
+  if (!findResult)
       return;
-  const edited = await editJson(Object.assign(
-      {
-          appName: '',
-          plan: 'free',
-          email: '',
-      },
-      app,
-      {
-          updatedAt: undefined,
-      }));
+  const app = findResult.app;
+  const edited = await editJson<Partial<App>>({
+      appName: '',
+      plan: 'free',
+      email: '',
+      ...(app as Partial<App>),
+      updatedAt: undefined,
+  });
   if (!edited || !edited.appName) {
       console.log('Canceled');
       process.exit(1);
@@ -29,7 +27,7 @@ export async function editApp(data: Database, filter: string) {
   await doYouConfirm(JSON.stringify(edited, null, 4));
   Object.assign(app, edited);
   app.updatedAt = new Date().toISOString();
-  saveDataSync(data);
+  saveDataSync(data, { type: "company", name: findResult.company.name });
   console.log('Contact updated.');
   return {
       ...app,

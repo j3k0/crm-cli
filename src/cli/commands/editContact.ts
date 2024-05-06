@@ -9,20 +9,18 @@ export async function editContact(data: Database, filter: string): Promise<(Cont
       console.log('Usage: crm edit-contact NAME');
       process.exit(1);
   }
-  const contact = findContact(data, filter); // fuzzy search for the company
-  if (!contact)
+  const findResult = findContact(data, filter); // fuzzy search for the company
+  if (!findResult)
       return;
-  const edited = await editJson(Object.assign(
-      {
-          firstName: '',
-          lastName: '',
-          email: '',
-          url: '',
-      },
-      contact,
-      {
-          updatedAt: undefined,
-      }));
+  const contact = findResult.contact;
+  const edited = await editJson<Partial<Contact>>({
+      firstName: '',
+      lastName: '',
+      email: '',
+      url: '',
+      ...(contact as Partial<Contact>),
+      updatedAt: undefined,
+  });
   if (!edited || !edited.email) {
       console.log('Canceled');
       process.exit(1);
@@ -30,7 +28,7 @@ export async function editContact(data: Database, filter: string): Promise<(Cont
   await doYouConfirm(JSON.stringify(edited, null, 4));
   Object.assign(contact, edited);
   contact.updatedAt = new Date().toISOString();
-  saveDataSync(data);
+  saveDataSync(data, { type: "company", name: findResult.company.name });
   console.log('Contact updated.');
   return {
       ...contact,

@@ -8,6 +8,7 @@ import { Choice, Database, Interaction, Printable } from "../../types";
 import { addCompany } from './addCompany';
 import { addContact } from './addContact';
 import Lib from '../../lib';
+import moment from 'moment';
 
 
 export async function addInteraction(data: Database, filter: string | undefined): Promise<Interaction & Printable> {
@@ -131,6 +132,10 @@ export async function addInteraction(data: Database, filter: string | undefined)
   if (interaction.from === 'new_contact') {
       const newContact = await addContact(data, undefined, {company: interaction.company});
       interaction.from = newContact.email;
+  }
+
+  if (interaction.followUpDate) {
+    interaction.followUpDate = moment(interaction.followUpDate).toISOString();
   }
 
   // Add it and save

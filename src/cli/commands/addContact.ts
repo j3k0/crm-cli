@@ -49,7 +49,7 @@ export async function addContact(data: Database, filter: string | undefined, val
       contact.lastName = contact.lastName || '';
       // Find the company in the data
       company.contacts.push(contact as Contact);
-      saveDataSync(data);
+      saveDataSync(data, { type: "company", name: company.name });
       console.log('Contact added.');
       // contacts(data, company.name).printAsText();;
       // process.exit(0);

@@ -10,13 +10,14 @@ export async function doneInteraction(data: Database, filter?: string) {
   }
   let interaction;
   if ('' + parseInt(filter) === filter) {
-      interaction = findInteraction(data, filter);
-      if (!interaction)
+      const findResult = findInteraction(data, filter);
+      if (!findResult)
           throw `ERROR: Interaction with ID "${filter}" not found.`;
+      interaction = findResult.interaction;
       interaction.updatedAt = new Date().toISOString();
       interaction.followUpDate = undefined;
       await doYouConfirm(JSON.stringify(interaction, null, 4));
-      saveDataSync(data);
+      saveDataSync(data, { type: "company", name: findResult.company.name });
       console.log('Interaction updated.');
   }
   return { printAsText: () => {} };

@@ -1,12 +1,12 @@
 import Fuse from "fuse.js";
-import { App, Company, Database, InteractionKind, PrintableArray } from "../types";
+import { App, Company, Database, PrintableArray } from "../types";
 import { defaultTableOptions, fieldToText, tableToString } from "../cli/table";
 import Table from "cli-table";
 
 export interface InteractionsResult {
   id?: number;
   company: Company["name"];
-  kind: InteractionKind;
+  kind: string;
   date: App["createdAt"] | '';
   from: string;
   summary: string;

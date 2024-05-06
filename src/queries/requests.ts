@@ -1,18 +1,48 @@
 import Fuse from "fuse.js";
-import { App, CompanyAttributes, Contact, Database } from "../types";
+import { App, Company, CompanyAttributes, Contact, Database, Interaction } from "../types";
+
+export interface CompanyContact {
+    contact: Contact;
+    company: Company;
+    firstName: Contact["firstName"];
+    lastName: Contact["lastName"];
+    email: Contact["email"];
+}
+export interface CompanyApp {
+    app: App;
+    company: Company;
+    appName: App["appName"];
+    email: App["email"];
+}
+
+export interface CompanyInteraction {
+    interaction: Interaction;
+    company: Company;
+}
 
 // Requests
-export const allContacts = (data: Database) =>
-    data.companies.reduce((acc: Contact[], company: CompanyAttributes) => {
-        company.contacts.forEach((contact: Contact) => acc.push(contact));
+export const allContacts = (data: Database): CompanyContact[] =>
+    data.companies.reduce((acc, company: Company) => {
+        company.contacts.forEach((contact: Contact) => acc.push({
+            contact,
+            company,
+            firstName: contact.firstName,
+            lastName: contact.lastName,
+            email: contact.email,
+        }));
         return acc;
-     }, [] as Contact[]);
+     }, [] as CompanyContact[]);
 
 export const allApps = (data: Database) =>
     data.companies.reduce(function (acc, company) {
-        company.apps.forEach((app) => acc.push(app));
+        company.apps.forEach((app) => acc.push({
+            app,
+            company,
+            email: app.email,
+            appName: app.appName,
+        }));
         return acc;
-    }, [] as App[]);
+    }, [] as CompanyApp[]);
 
 function fuseFind<T> (keys: (keyof T)[], data: readonly T[], search?: string): T | undefined {
     if (!search) return;
@@ -29,20 +59,20 @@ function fuseFind<T> (keys: (keyof T)[], data: readonly T[], search?: string): T
         .search(search)[0];
 }
 
-export const findContact = (data: Database, search: string | undefined) =>
+export const findContact = (data: Database, search: string | undefined): { contact: Contact, company: Company } | undefined =>
     fuseFind(['firstName', 'lastName', 'email'], allContacts(data), search);
 
 export const findCompany = (data: Database, search: string | undefined) =>
     fuseFind(['name'], data.companies, search);
 
-export const findApp = (data: Database, search: string | undefined) =>
+export const findApp = (data: Database, search: string | undefined): { app: App, company: Company } | undefined =>
     fuseFind(['appName', 'email'], allApps(data), search);
 
-export const findInteraction = (data: Database, indexAsString: string) => {
+export const findInteraction = (data: Database, indexAsString: string): { interaction: Interaction, company: Company } | undefined => {
     const index = parseInt(indexAsString) | 0;
     let id = 1;
     for (const company of data.companies)
         for (const interaction of company.interactions)
             if (id++ === index)
-                return interaction;
+                return {company, interaction};
 };

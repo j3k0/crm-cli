@@ -13,7 +13,7 @@ export function addCompany(data: Database, company: Partial<CompanyAttributes>):
       company.apps = [];
       const ret = new Company(company as CompanyAttributes);
       data.companies.push(ret);
-      saveDataSync(data);
+      saveDataSync(data, { type: "company", name: ret.name });
       console.log('Company added.');
       return ret;
   }
@@ -41,7 +41,7 @@ export function addApp(data: Database, app: Partial<App & { company?: string | u
         // Find the company in the data
         const ret = app as App;
         company.apps.push(ret);
-        saveDataSync(data);
+        saveDataSync(data, { type: "company", name: company.name });
         console.log('App added.');
         return ret;
     }
@@ -68,9 +68,9 @@ export function addInteraction(data: Database, interaction: Interaction & { comp
         // interaction.createdAt = new Date().toISOString();
         // Find the company in the data
         interaction.date = interaction.date || new Date().toISOString();
-        interaction.from = contact.email;
+        interaction.from = contact.contact.email;
         company.interactions.push(interaction);
-        saveDataSync(data);
+      saveDataSync(data, { type: "company", name: company.name });
         console.log('Interaction added.');
     }
     else if (!company) {
@@ -92,7 +92,7 @@ interface StaffDefinition {
 export function addStaff(data: Database, staff: Partial<StaffDefinition>): { [email: string]: string } | { error: string } {
   if (staff.name && staff.email) {
     data.config.staff[staff.email] = staff.name;
-    saveDataSync(data);
+    saveDataSync(data, { type: "config" });
     return data.config.staff;
   }
   else {

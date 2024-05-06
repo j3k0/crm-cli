@@ -1,13 +1,13 @@
-export type InteractionKind =
-    | 'system'
-    | 'email'
-    | 'github'
-    | 'contact-form'
-    | 'phone'
-    | 'real-life'
-    | 'linkedin'
-    | 'none'
-;
+// export type InteractionKind =
+//     | 'system'
+//     | 'email'
+//     | 'github'
+//     | 'contact-form'
+//     | 'phone'
+//     | 'real-life'
+//     | 'linkedin'
+//     | 'none'
+// ;
 
 export interface Database {
     companies: Company[];
@@ -57,7 +57,7 @@ export interface App {
 }
 
 export interface Interaction {
-    kind: InteractionKind;
+    kind: string;
     from: string;
     summary: string;
     date: string; // ISODate

@@ -47,34 +47,34 @@ export async function template(data: Database, arg: string) {
 
   // If any results are non-ambiguous
   if (filteredApp && filteredApp.length === 1) {
-      contact = findContact(data, filteredApp[0].email);
+      contact = findContact(data, filteredApp[0].email)?.contact;
       company = findCompany(data, filteredApp[0].company);
-      app = findApp(data, filteredApp[0].email);
+      app = findApp(data, filteredApp[0].email)?.app;
   }
   else if (filteredContact && filteredContact.length === 1) {
-      app = findApp(data, filteredContact[0].company);
+      app = findApp(data, filteredContact[0].company)?.app;
       company = findCompany(data, filteredContact[0].company);
-      contact = findContact(data, filteredContact[0].email);
+      contact = findContact(data, filteredContact[0].email)?.contact;
   }
   else if (filteredCompany && filteredCompany.length === 1) {
-      app = findApp(data, filteredCompany[0].name);
-      contact = findContact(data, filteredCompany[0].name);
+      app = findApp(data, filteredCompany[0].name)?.app;
+      contact = findContact(data, filteredCompany[0].name)?.contact;
       company = findCompany(data, filteredCompany[0].name);
   }
   // If some results are ambiguous, pick app, or contact, or company
   else if (filteredApp && filteredApp.length > 1) {
-      contact = findContact(data, filteredApp[0].email);
+      contact = findContact(data, filteredApp[0].email)?.contact;
       company = findCompany(data, filteredApp[0].company);
-      app = findApp(data, filteredApp[0].email);
+      app = findApp(data, filteredApp[0].email)?.app;
   }
   else if (filteredContact && filteredContact.length > 1) {
-      app = findApp(data, filteredContact[0].company);
+      app = findApp(data, filteredContact[0].company)?.app;
       company = findCompany(data, filteredContact[0].company);
-      contact = findContact(data, filteredContact[0].email);
+      contact = findContact(data, filteredContact[0].email)?.contact;
   }
   else if (filteredCompany && filteredCompany.length > 1) {
-      app = findApp(data, filteredCompany[0].name);
-      contact = findContact(data, filteredCompany[0].name);
+      app = findApp(data, filteredCompany[0].name)?.app;
+      contact = findContact(data, filteredCompany[0].name)?.contact;
       company = findCompany(data, filteredCompany[0].name);
   }
   // Else, no result
