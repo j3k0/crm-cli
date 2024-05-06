@@ -3,8 +3,7 @@ import { App, Choice, Database } from "../../types";
 import { doYouConfirm } from '../utils';
 import { addCompany } from './addCompany';
 import { addContact } from './addContact';
-import { saveDataSync } from '../../database';
-import { findCompany } from '../../queries/requests';
+import Lib from '../../lib';
 
 export const addApp = async (data: Database, filter: string, values: Partial<App & {company?: string}> = {}) => {
   console.log('');
@@ -64,7 +63,8 @@ export const addApp = async (data: Database, filter: string, values: Partial<App
 
   if (app.company === 'new_company') {
       const newCompany = await addCompany(data, undefined);
-      app.company = newCompany.name;
+      if ('name' in newCompany)
+        app.company = newCompany.name;
   }
 
   if (app.email === 'new_contact') {
@@ -72,26 +72,12 @@ export const addApp = async (data: Database, filter: string, values: Partial<App
       app.email = newContact.email;
   }
 
-  // If name is filled and there isn't a company with the given name.
-  // Add it and save
-  const companyName = app.company;
-  const company = findCompany(data, companyName); // fuzzy search for the company
-  delete app.company;
-  if (company) {
-      app.createdAt = (app.createdAt ? new Date(app.createdAt) : new Date()).toISOString();
-      app.upgradedAt = app.upgradedAt ? new Date(app.upgradedAt).toISOString() : undefined;
-      app.updatedAt = new Date().toISOString();
-      // Find the company in the data
-      company.apps.push(app as App);
-      saveDataSync(data);
-      console.log('App added.');
-  }
-  else {
-      console.error(`ERROR: Company with name "${companyName}" doesn't exists.`);
-      process.exit(1);
+  const addedApp = Lib.addApp(data, app);
+  if ('error' in addedApp) {
+    process.exit(1);
   }
   return {
-    ...app,
+    ...addedApp,
     printAsText: () => { },
   };
 };

@@ -45,5 +45,4 @@ export const findInteraction = (data: Database, indexAsString: string) => {
         for (const interaction of company.interactions)
             if (id++ === index)
                 return interaction;
-    return;
 };

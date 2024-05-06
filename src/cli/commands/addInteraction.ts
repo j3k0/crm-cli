@@ -5,10 +5,9 @@ import { companies } from "../../queries/companies";
 import { contacts } from "../../queries/contacts";
 import { interactions } from "../../queries/interactions";
 import { Choice, Database, Interaction, Printable } from "../../types";
-import { findCompany, findContact } from '../../queries/requests';
-import { saveDataSync } from '../../database';
 import { addCompany } from './addCompany';
 import { addContact } from './addContact';
+import Lib from '../../lib';
 
 
 export async function addInteraction(data: Database, filter: string | undefined): Promise<Interaction & Printable> {
@@ -124,7 +123,9 @@ export async function addInteraction(data: Database, filter: string | undefined)
 
   if (interaction.company === 'new_company') {
       const newCompany = await addCompany(data, undefined);
-      interaction.company = newCompany.name;
+      if ('name' in newCompany) {
+        interaction.company = newCompany.name;
+      }
   }
 
   if (interaction.from === 'new_contact') {
@@ -133,25 +134,8 @@ export async function addInteraction(data: Database, filter: string | undefined)
   }
 
   // Add it and save
-  const companyName = interaction.company;
-  const company = findCompany(data, companyName); // fuzzy search for the company
-  delete (interaction as any).company;
-  const contact = findContact(data, interaction.from);
-  if (company && contact) {
-      // interaction.createdAt = new Date().toISOString();
-      // Find the company in the data
-      interaction.date = interaction.date || new Date().toISOString();
-      interaction.from = contact.email;
-      company.interactions.push(interaction);
-      saveDataSync(data);
-      console.log('Interaction added.');
-  }
-  else if (!company) {
-      console.error(`ERROR: Company with name "${companyName}" doesn't exists.`);
-      process.exit(1);
-  }
-  else if (!contact) {
-      console.error(`ERROR: Contact with email "${interaction.from}" doesn't exists.`);
+  const newInteraction = Lib.addInteraction(data, interaction);
+  if ('error' in newInteraction) {
       process.exit(1);
   }
   return {
@@ -159,4 +143,3 @@ export async function addInteraction(data: Database, filter: string | undefined)
       printAsText: () => { },
   }
 };
-

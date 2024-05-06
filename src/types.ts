@@ -9,7 +9,7 @@ export type InteractionKind =
     | 'none'
 ;
 
-export type Database = {
+export interface Database {
     companies: Company[];
     config: {
         subscriptionPlans: string[];

@@ -61,7 +61,7 @@ export function interactions(data: Database, filter?: string, delColumns?: (keyo
               kind: interaction.kind || '',
               date: interaction.date || '',
               from: interaction.from,
-              summary: interaction.summary.replace(/([.?!]) /g, '$1\n'),
+              summary: (interaction.summary || '').replace(/([.?!]) /g, '$1\n'),
               followup: interaction.followUpDate || '',
           });
       });
