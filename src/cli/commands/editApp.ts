@@ -1,4 +1,4 @@
-import { saveDataSync } from "../../database";
+import { saveData } from "../../database";
 import { findApp } from "../../queries/requests";
 import { App, Database } from "../../types";
 import { editJson } from "../editor";
@@ -27,7 +27,7 @@ export async function editApp(data: Database, filter: string) {
   await doYouConfirm(JSON.stringify(edited, null, 4));
   Object.assign(app, edited);
   app.updatedAt = new Date().toISOString();
-  saveDataSync(data, { type: "company", name: findResult.company.name });
+  await saveData(data, { company: findResult.company.name });
   console.log('Contact updated.');
   return {
       ...app,

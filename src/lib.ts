@@ -1,8 +1,8 @@
-import { saveDataSync } from "./database";
-import { findApp, findCompany, findContact } from "./queries/requests";
+import { saveData } from "./database";
+import { findApp, findAppByName, findCompany, findCompanyByName, findContact } from "./queries/requests";
 import { App, Company, CompanyAttributes, Config, Contact, Database, Interaction } from "./types";
 
-export function addCompany(data: Database, company: Partial<CompanyAttributes>): Company | {} {
+export async function addCompany(data: Database, company: Partial<CompanyAttributes>): Promise<Company | {}> {
 
   const found = company.name && data.companies.find((c) => c.name.toLowerCase() === company.name!.toLowerCase());
   if (company.name && !found) {
@@ -13,7 +13,7 @@ export function addCompany(data: Database, company: Partial<CompanyAttributes>):
       company.apps = [];
       const ret = new Company(company as CompanyAttributes);
       data.companies.push(ret);
-      saveDataSync(data, { type: "company", name: ret.name });
+      await saveData(data, { company: ret.name });
       console.log('Company added.');
       return ret;
   }
@@ -28,13 +28,35 @@ export function addCompany(data: Database, company: Partial<CompanyAttributes>):
   return {}
 }
 
-export function editApp(data: Database, appName: string, attributes: Partial<App>): App | {error: string} {
+export async function editCompany(data: Database, name: string, attributes: Partial<CompanyAttributes>): Promise<Company | {error: string}> {
+    // If name is filled and there isn't a company with the given name.
+    // Add it and save
+    if (!name) {
+      return {error: 'missing name'};
+    }
+    const company = findCompanyByName(data, name);
+    if (!company) {
+      return {error: 'company not found'};
+    }
+    if (attributes.name !== undefined && attributes.name !== name) {
+      return {error: 'incorrect body name'};
+    }
+    Object.assign(company, {
+      ...attributes,
+      updatedAt: new Date().toISOString(),
+    });
+    await saveData(data, { company: name });
+    console.log('Company updated.');
+    return company;
+}
+
+export async function editApp(data: Database, appName: string, attributes: Partial<App>): Promise<App | {error: string}> {
     // If name is filled and there isn't a company with the given name.
     // Add it and save
     if (!appName) {
       return {error: 'missing appName'};
     }
-    const app = findApp(data, appName);
+    const app = findAppByName(data, appName);
     if (!app || app.app.appName !== appName) {
       return {error: 'app not found'};
     }
@@ -45,12 +67,12 @@ export function editApp(data: Database, appName: string, attributes: Partial<App
       ...attributes,
       updatedAt: new Date().toISOString(),
     });
-    saveDataSync(data, { type: "company", name: app.company.name });
+    await saveData(data, { company: app.company.name });
     console.log('App updated.');
     return app.app;
 }
 
-export function addContact(data: Database, attributes: Partial<Contact & { company?: string | undefined; }>): Contact | {error: string} {
+export async function addContact(data: Database, attributes: Partial<Contact & { company?: string | undefined; }>): Promise<Contact | {error: string}> {
     // If name is filled and there isn't a company with the given name.
     // Add it and save
     if (!attributes.company || !attributes.email) {
@@ -69,7 +91,7 @@ export function addContact(data: Database, attributes: Partial<Contact & { compa
         // Find the company in the data
         const ret = attributes as Contact;
         company.contacts.push(ret);
-        saveDataSync(data, { type: "company", name: company.name });
+        await saveData(data, { company: company.name });
         console.log('Contact added.');
         return ret;
     }
@@ -81,7 +103,7 @@ export function addContact(data: Database, attributes: Partial<Contact & { compa
     }
 }
 
-export function addApp(data: Database, app: Partial<App & { company?: string | undefined; }>): App | {error: string} {
+export async function addApp(data: Database, app: Partial<App & { company?: string | undefined; }>): Promise<App | {error: string}> {
     // If name is filled and there isn't a company with the given name.
     // Add it and save
     if (!app.company || !app.appName) {
@@ -97,7 +119,7 @@ export function addApp(data: Database, app: Partial<App & { company?: string | u
         // Find the company in the data
         const ret = app as App;
         company.apps.push(ret);
-        saveDataSync(data, { type: "company", name: company.name });
+        await saveData(data, { company: company.name });
         console.log('App added.');
         return ret;
     }
@@ -109,7 +131,7 @@ export function addApp(data: Database, app: Partial<App & { company?: string | u
     }
 }
 
-export function addInteraction(data: Database, interaction: Interaction & { company: string; }): Interaction | {error: string} {
+export async function addInteraction(data: Database, interaction: Interaction & { company: string; }): Promise<Interaction | {error: string}> {
     if (!interaction.summary) {
       return {error: '"summary" is missing'};
     }
@@ -126,7 +148,7 @@ export function addInteraction(data: Database, interaction: Interaction & { comp
         interaction.date = interaction.date || new Date().toISOString();
         interaction.from = contact.contact.email;
         company.interactions.push(interaction);
-      saveDataSync(data, { type: "company", name: company.name });
+        await saveData(data, { company: company.name });
         console.log('Interaction added.');
     }
     else if (!company) {
@@ -145,10 +167,10 @@ interface StaffDefinition {
   email: string;
 }
 
-export function addStaff(data: Database, staff: Partial<StaffDefinition>): { [email: string]: string } | { error: string } {
+export async function addStaff(data: Database, staff: Partial<StaffDefinition>): Promise<{ [email: string]: string } | { error: string }> {
   if (staff.name && staff.email) {
     data.config.staff[staff.email] = staff.name;
-    saveDataSync(data, { type: "config" });
+    await saveData(data, "config");
     return data.config.staff;
   }
   else {
@@ -156,9 +178,9 @@ export function addStaff(data: Database, staff: Partial<StaffDefinition>): { [em
   }
 }
 
-export function editConfig(data: Database, attributes: Partial<Config>): Config | { error: string } {
+export async function editConfig(data: Database, attributes: Partial<Config>): Promise<Config | { error: string }> {
   Object.assign(data.config, attributes);
-  saveDataSync(data, { type: "config" });
+  await saveData(data, "config");
   return data.config;
 }
 
@@ -167,7 +189,8 @@ export default {
   addApp,
   addContact,
   addInteraction,
-  editApp,
   addStaff,
+  editApp,
   editConfig,
+  editCompany,
 }

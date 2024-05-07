@@ -1,4 +1,4 @@
-import { initDataSync, loadDataSync, saveDataSync } from "../database";
+import { initData, loadData, saveData} from "../database";
 import { about } from "../queries/about";
 import { apps } from "../queries/apps";
 import { companies } from "../queries/companies";
@@ -23,9 +23,9 @@ module.exports = {
     //     editFile,
     // },
     data: {
-        initSync: initDataSync,
-        loadSync: loadDataSync,
-        saveSync: saveDataSync,
+        init: initData,
+        load: loadData,
+        save: saveData,
     },
     interactions: {
         edit: editInteraction,

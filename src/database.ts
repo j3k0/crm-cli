@@ -7,9 +7,14 @@ const dataDir = process.env.DATA_DIR || process.cwd();
 // name of the data file
 const dataFile = process.env.DATA_FILE || 'crm.json';
 
-export function loadDataSync(): Database {
-    if (fs.existsSync(`${dataDir}/${dataFile}`)) {
-        const data = require(`${dataDir}/${dataFile}`);
+const dataFullPath = `${dataDir}/${dataFile}`;
+
+export type DataSelector = "all" | "config" | { company: string } | { appName: string };
+
+export async function loadData(selector: DataSelector): Promise<Database> {
+    try {
+        const fileContent = await fs.promises.readFile(dataFullPath, 'utf8');
+        const data = JSON.parse(fileContent);
         if (Array.isArray(data)) {
             // old format
             return {
@@ -26,29 +31,31 @@ export function loadDataSync(): Database {
             return data as Database;
         }
     }
-    else {
-        console.error(`ERROR: File ${dataDir}/${dataFile} not found.`);
+    catch (err) {
+        if (err instanceof Error) {
+            console.error(`ERROR #${err.name}: ${err.message}.`);
+        }
         console.error(`Run "crm init-crm" and I'll create it for you.`);
-        process.exit(1);
+        throw err;
     }
 }
 
-export type SaveDataSelector = {
-    type: "config";
-} | {
-    type: "company";
-    name: string;
+export async function saveData(data: Database, selector: DataSelector): Promise<void> {
+    // first backup the file
+    await fs.promises.copyFile(`${dataDir}/${dataFile}`, `${dataDir}/${dataFile}.bak`);
+    // then save the new content
+    await fs.promises.writeFile(dataFullPath, JSON.stringify(data, null, 4), 'utf-8');
 }
 
-export function saveDataSync(data: Database, selector: SaveDataSelector) {
-    fs.copyFileSync(`${dataDir}/${dataFile}`, `${dataDir}/${dataFile}.bak`);
-    fs.writeFileSync(`${dataDir}/${dataFile}`, JSON.stringify(data, null, 4));
+export async function initData(): Promise<Database> {
+    const data = emptyDatabase();
+    await fs.promises.writeFile(dataFullPath, JSON.stringify(data, null, 4), 'utf-8');
+    return data;
 }
 
-export const initDataSync = () => {
-    fs.writeFileSync(`${dataDir}/${dataFile}`, JSON.stringify(emptyDatabase(), null, 4));
-};
-
+/**
+ * Generate an empty database
+ */
 function emptyDatabase(): Database {
     return {
         companies: [],
@@ -64,7 +71,7 @@ function emptyDatabase(): Database {
 }
 
 export default {
-    initSync: initDataSync,
-    loadSync: loadDataSync,
-    saveSync: saveDataSync,
+    init: initData,
+    load: loadData,
+    save: saveData,
 }

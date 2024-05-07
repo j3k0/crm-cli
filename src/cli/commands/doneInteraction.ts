@@ -1,4 +1,4 @@
-import { saveDataSync } from "../../database";
+import { saveData } from "../../database";
 import { findInteraction } from "../../queries/requests";
 import { Database } from "../../types";
 import { doYouConfirm } from "../utils";
@@ -17,7 +17,7 @@ export async function doneInteraction(data: Database, filter?: string) {
       interaction.updatedAt = new Date().toISOString();
       interaction.followUpDate = undefined;
       await doYouConfirm(JSON.stringify(interaction, null, 4));
-      saveDataSync(data, { type: "company", name: findResult.company.name });
+      await saveData(data, { company: findResult.company.name });
       console.log('Interaction updated.');
   }
   return { printAsText: () => {} };

@@ -1,4 +1,4 @@
-import { saveDataSync } from "../../database";
+import { saveData } from "../../database";
 import { editJson } from "../editor";
 import { findInteraction } from "../../queries/requests";
 import { Database, Interaction, Printable } from "../../types";
@@ -35,7 +35,7 @@ export async function editInteraction(data: Database, filter?: string): Promise<
           interaction.followUpDate = moment(interaction.followUpDate).toISOString();
       }
       interaction.updatedAt = new Date().toISOString();
-      saveDataSync(data, { type: "company", name: findResult.company.name });
+      await saveData(data, { company: findResult.company.name });
       console.log('Interaction updated.');
   }
   if (!interaction) {

@@ -71,8 +71,14 @@ export const findContact = (data: Database, search: string | undefined): { conta
 export const findCompany = (data: Database, search: string | undefined) =>
     fuseFind(['name'], data.companies, search);
 
+export const findCompanyByName = (data: Database, companyName: string | undefined): Company | undefined =>
+    data.companies.find(value => value.name === companyName);
+
 export const findApp = (data: Database, search: string | undefined): { app: App, company: Company } | undefined =>
     fuseFind(['appName', 'email'], allApps(data), search);
+
+export const findAppByName = (data: Database, appName: string | undefined): { app: App, company: Company } | undefined =>
+    allApps(data).find(value => value.appName === appName);
 
 export const findInteraction = (data: Database, indexAsString: string): { interaction: Interaction, company: Company } | undefined => {
     const index = parseInt(indexAsString) | 0;

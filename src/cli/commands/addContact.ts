@@ -1,6 +1,6 @@
 import enquirer from 'enquirer';
 import { doYouConfirm } from "../utils";
-import { saveDataSync } from "../../database";
+import { saveData } from "../../database";
 import { findCompany } from "../../queries/requests";
 import { Contact, Database, Printable } from "../../types";
 
@@ -49,7 +49,7 @@ export async function addContact(data: Database, filter: string | undefined, val
       contact.lastName = contact.lastName || '';
       // Find the company in the data
       company.contacts.push(contact as Contact);
-      saveDataSync(data, { type: "company", name: company.name });
+      await saveData(data, { company: company.name });
       console.log('Contact added.');
       // contacts(data, company.name).printAsText();;
       // process.exit(0);

@@ -1,7 +1,7 @@
 import enquirer from 'enquirer';
 import { Company, CompanyAttributes, Database, Printable } from '../../types';
 import { doYouConfirm } from '../utils';
-import { saveDataSync } from '../../database';
+import { saveData } from '../../database';
 import Lib from '../../lib';
 
 export async function addCompany(data: Database, filter: string | undefined, values: Partial<CompanyAttributes> = {}): Promise<(CompanyAttributes | {}) & Printable> {
@@ -29,7 +29,7 @@ export async function addCompany(data: Database, filter: string | undefined, val
   await doYouConfirm();
   // If name is filled and there isn't a company with the given name.
   // Add it and save
-  const ret = Lib.addCompany(data, company);
+  const ret = await Lib.addCompany(data, company);
   return {
       ...ret,
       printAsText: () => { },

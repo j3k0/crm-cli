@@ -93,20 +93,21 @@ Object.keys(commands).forEach((key) => {
     commands[`--${key}`] = commands[key];
 });
 
-if (process.argv[2] === 'init-crm') {
-    crmCli.data.initSync();
-    console.log('Done.');
-    process.exit(0);
-}
+async function main() {
 
-const data = crmCli.data.loadSync();
-const command = commands[process.argv[2]];
-if (!command) {
-    help();
-    process.exit(1);
-}
-const filter = process.argv.slice(3).join(' ');
-(async function() {
+    if (process.argv[2] === 'init-crm') {
+        await crmCli.data.init();
+        console.log('Done.');
+        process.exit(0);
+    }
+
+    const data = await crmCli.data.load("all");
+    const command = commands[process.argv[2]];
+    if (!command) {
+        help();
+        process.exit(1);
+    }
+    const filter = process.argv.slice(3).join(' ');
     try {
         const report = await command(data, filter);
         if (report && report.printAsText)
@@ -115,4 +116,5 @@ const filter = process.argv.slice(3).join(' ');
     catch (e) {
         console.error(e);
     }
-})();
+}
+main();
