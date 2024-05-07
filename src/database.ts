@@ -11,6 +11,7 @@ export function loadDataSync(): Database {
     if (fs.existsSync(`${dataDir}/${dataFile}`)) {
         const data = require(`${dataDir}/${dataFile}`);
         if (Array.isArray(data)) {
+            // old format
             return {
                 companies: data,
                 config: emptyDatabase().config,

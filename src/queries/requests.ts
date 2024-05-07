@@ -46,7 +46,7 @@ export const allApps = (data: Database) =>
 
 function fuseFind<T> (keys: (keyof T)[], data: readonly T[], search?: string): T | undefined {
     if (!search) return;
-    return (new Fuse(data,
+    const searchResults = (new Fuse(data,
         {
             matchAllTokens: true,
             threshold: 0.1,
@@ -56,11 +56,17 @@ function fuseFind<T> (keys: (keyof T)[], data: readonly T[], search?: string): T
             // limit: 1,
             keys,
         }))
-        .search(search)[0];
+        .search(search);
+    // find exact match
+    for (const result of searchResults) {
+        if (result[keys[0]] === search) return result;
+    }
+    // no exact match, return first match
+    return searchResults[0];
 }
 
 export const findContact = (data: Database, search: string | undefined): { contact: Contact, company: Company } | undefined =>
-    fuseFind(['firstName', 'lastName', 'email'], allContacts(data), search);
+    fuseFind(['email', 'firstName', 'lastName'], allContacts(data), search);
 
 export const findCompany = (data: Database, search: string | undefined) =>
     fuseFind(['name'], data.companies, search);

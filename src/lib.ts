@@ -1,6 +1,6 @@
 import { saveDataSync } from "./database";
-import { findCompany, findContact } from "./queries/requests";
-import { App, Company, CompanyAttributes, Database, Interaction } from "./types";
+import { findApp, findCompany, findContact } from "./queries/requests";
+import { App, Company, CompanyAttributes, Config, Contact, Database, Interaction } from "./types";
 
 export function addCompany(data: Database, company: Partial<CompanyAttributes>): Company | {} {
 
@@ -28,9 +28,65 @@ export function addCompany(data: Database, company: Partial<CompanyAttributes>):
   return {}
 }
 
+export function editApp(data: Database, appName: string, attributes: Partial<App>): App | {error: string} {
+    // If name is filled and there isn't a company with the given name.
+    // Add it and save
+    if (!appName) {
+      return {error: 'missing appName'};
+    }
+    const app = findApp(data, appName);
+    if (!app || app.app.appName !== appName) {
+      return {error: 'app not found'};
+    }
+    if (attributes.appName !== undefined && attributes.appName !== appName) {
+      return {error: 'incorrect body appName'};
+    }
+    Object.assign(app.app, {
+      ...attributes,
+      updatedAt: new Date().toISOString(),
+    });
+    saveDataSync(data, { type: "company", name: app.company.name });
+    console.log('App updated.');
+    return app.app;
+}
+
+export function addContact(data: Database, attributes: Partial<Contact & { company?: string | undefined; }>): Contact | {error: string} {
+    // If name is filled and there isn't a company with the given name.
+    // Add it and save
+    if (!attributes.company || !attributes.email) {
+      return {error: 'missing company or email'};
+    }
+    const companyName = attributes.company;
+    const company = findCompany(data, companyName); // fuzzy search for the company
+    delete attributes.company;
+    const existing = findContact(data, attributes.email);
+    if (existing?.contact.email === attributes.email) {
+      return {error: 'contact already exists in company ' + existing?.company.name};
+    }
+    if (company) {
+        attributes.createdAt = (attributes.createdAt ? new Date(attributes.createdAt) : new Date()).toISOString();
+        attributes.updatedAt = new Date().toISOString();
+        // Find the company in the data
+        const ret = attributes as Contact;
+        company.contacts.push(ret);
+        saveDataSync(data, { type: "company", name: company.name });
+        console.log('Contact added.');
+        return ret;
+    }
+    else {
+        console.error(`ERROR: Company with name "${companyName}" doesn't exists.`);
+        return {
+          error: `Company with name "${companyName}" doesn't exists.`
+        };
+    }
+}
+
 export function addApp(data: Database, app: Partial<App & { company?: string | undefined; }>): App | {error: string} {
     // If name is filled and there isn't a company with the given name.
     // Add it and save
+    if (!app.company || !app.appName) {
+      return {error: 'missing company or appName'};
+    }
     const companyName = app.company;
     const company = findCompany(data, companyName); // fuzzy search for the company
     delete app.company;
@@ -100,9 +156,18 @@ export function addStaff(data: Database, staff: Partial<StaffDefinition>): { [em
   }
 }
 
+export function editConfig(data: Database, attributes: Partial<Config>): Config | { error: string } {
+  Object.assign(data.config, attributes);
+  saveDataSync(data, { type: "config" });
+  return data.config;
+}
+
 export default {
   addCompany,
   addApp,
+  addContact,
   addInteraction,
+  editApp,
   addStaff,
+  editConfig,
 }

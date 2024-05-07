@@ -5,6 +5,7 @@ import Lib from './lib';
 import { contacts } from './queries/contacts';
 import { interactions } from './queries/interactions';
 import { apps } from './queries/apps';
+import { findApp, findCompany, findContact } from './queries/requests';
 
 const app = express();
 const port = parseInt(process.env.PORT || '3954');
@@ -25,6 +26,13 @@ app.get('/companies', (req, res) => {
 app.get('/companies/search/:filter', (req, res) => {
     res.json({
       rows: companies(loadDataSync(), req.params.filter).content
+    });
+});
+
+app.get('/companies/find/:name', (req, res) => {
+    console.log(`GET /companies/find/${req.params.name}`);
+    res.json({
+      rows: findCompany(loadDataSync(), req.params.name)
     });
 });
 
@@ -90,18 +98,30 @@ app.get('/contacts/search/:filter', (req, res) => {
     });
 });
 
+// GET endpoint to retrieve some contacts
+app.get('/contacts/find/:email', (req, res) => {
+    res.json(findContact(loadDataSync(), req.params.email)?.contact);
+});
+
 // POST endpoint to create a new contact
 app.post('/contacts', (req, res) => {
     const newContact = req.body; // Assuming the request body contains the new contact data
+    const added = Lib.addContact(loadDataSync(), newContact);
+    if ('error' in added) {
+      res.status(400).json({
+        message: 'Failed to add interaction: ' + added.error
+      });
+      return;
+    }
     res.json({
         message: 'Contact added successfully',
-        contact: {}, // Replace with actual contact data
+        contact: added,
     });
 });
 
 // PUT endpoint to update an existing contact
-app.put('/contacts/:id', (req, res) => {
-    const contactId = req.params.id;
+app.put('/contacts/:email', (req, res) => {
+    const contactEmail = req.params.email;
     const updatedContact = req.body; // Assuming the request body contains the updated contact data
     // Implement logic to update an existing contact
     res.json({
@@ -133,6 +153,11 @@ app.get('/apps/search/:filter', (req, res) => {
     });
 });
 
+// GET endpoint to retrieve some apps
+app.get('/apps/find/:appName', (req, res) => {
+    res.json(findApp(loadDataSync(), req.params.appName)?.app);
+});
+
 // POST to add an app
 app.post('/apps', (req, res) => {
   const newApp = req.body;
@@ -150,7 +175,38 @@ app.post('/apps', (req, res) => {
   }
 });
 
-app.post('/staff', (req, res) => {
+// PUT to update an app
+app.put('/apps/:appName', (req, res) => {
+  const attributes = req.body;
+  console.log(`PUT /apps/${req.params.appName}: ${JSON.stringify(attributes)}`);
+  const added = Lib.editApp(loadDataSync(), req.params.appName, attributes);
+  if ('error' in added) {
+    res.status(400).json({
+      message: 'Failed to updated app: ' + added.error
+    });
+  }
+  else {
+    res.json({
+      message: 'App added successfully',
+      app: added,
+    });
+  }
+});
+
+app.put('/config', (req, res) => {
+  const attributes = req.body;
+  res.json(Lib.editConfig(loadDataSync(), attributes));
+});
+
+app.get('/config', (req, res) => {
+  res.json(loadDataSync().config);
+});
+
+app.get('/config/staff', (req, res) => {
+  res.json(loadDataSync().config.staff);
+});
+
+app.post('/config/staff', (req, res) => {
   const newStaff = req.body; // format: { "name": "User Full Name", "email": "email@domain.com" }
   const added = Lib.addStaff(loadDataSync(), newStaff);
   if ('error' in added) {

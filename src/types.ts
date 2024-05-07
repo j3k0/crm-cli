@@ -9,16 +9,18 @@
 //     | 'none'
 // ;
 
+export interface Config {
+    subscriptionPlans: string[];
+    staff: { [email: string]: string };
+    interactions: {
+        kinds: string[];
+        tags: string[];
+    }
+}
+
 export interface Database {
     companies: Company[];
-    config: {
-        subscriptionPlans: string[];
-        staff: { [email: string]: string };
-        interactions: {
-            kinds: string[];
-            tags: string[];
-        },
-    }
+    config: Config;
 }
 
 export interface CompanyAttributes {
