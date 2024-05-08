@@ -120,6 +120,19 @@ Examples:
  * `crm about microsoft` will show all data you have about `Microsoft`.
  * `crm about marc twain` will show all data you have about `Marc Twain`.
 
+## DATABASE_URL
+
+The DATABASE_URL environment variable sets the connection to the database.
+
+Possible values:
+
+* `file://PATH/TO-FILE.json` - Relative path to a JSON file
+* `file:///PATH/TO-FILE.json` - Absolute path to a JSON file
+* `http://USER:API_KEY@HOST:PORT` - URL to a CRM server (see "server" command)
+* `couchdb://USER:PASSWORD@HOSTNAME:5984/DATABASE_NAME` - CouchDB over HTTP
+* `couchdbs://USER:PASSWORD@HOSTNAME:5984/DATABASE_NAME` - CouchDB over HTTPS
+* `memory://` - Non-persistent in-memory database (for testing)
+
 ## Best practices
 
  * Put the `crm.json` file in version control.

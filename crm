@@ -51,6 +51,8 @@ Configure with environment variables:
                         file:///path/to-file.json - absolute path to a JSON file
                         http://host:port - URL to a CRM server (see "server" command)
                         memory:// - Non-persistent in-memory database (for tests)
+                        couchdb://admin:password@hostname:5984/database_name - CouchDB over HTTP
+                        couchdbs://admin:password@hostname:5984/database_name - CouchDB over HTTPS
 
 `);
 };
