@@ -45,7 +45,7 @@ export async function contacts(database: DatabaseSession, filter?: string, delCo
 
   return {
       content: out,
-      printAsText: () => {
+      printAsText: async () => {
           const table = new Table( Object.assign(
               {head: displayColumns},
               defaultTableOptions));

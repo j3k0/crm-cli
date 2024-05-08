@@ -83,7 +83,7 @@ export async function interactions(database: DatabaseSession, filter?: string, d
 
   return {
       content: out,
-      printAsText: () => {
+      printAsText: async () => {
           const table = new Table( Object.assign(
               {head: displayColumns},
               defaultTableOptions));

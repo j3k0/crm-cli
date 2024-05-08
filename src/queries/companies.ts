@@ -22,7 +22,7 @@ export async function companies(database: DatabaseSession, filter?: string, delC
   }
   return {
       content: out,
-      printAsText: () => {
+      printAsText: async () => {
           const table = new Table(Object.assign(
               { head: displayColumns },
               defaultTableOptions));

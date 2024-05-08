@@ -15,6 +15,7 @@ import { editCompany } from "./commands/editCompany";
 import { editContact } from "./commands/editContact";
 import { editInteraction } from "./commands/editInteraction";
 import { template, templateHelp } from "./commands/template";
+import { serverRun } from "./commands/serverCommand";
 
 module.exports = {
     // utils: {
@@ -58,6 +59,9 @@ module.exports = {
     templates: {
         help: templateHelp,
         run: template,
+    },
+    server: {
+        run: serverRun,
     },
     about,
 };

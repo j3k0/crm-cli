@@ -29,7 +29,7 @@ The run the bellow command to initialize your data file.
 
     crm init-crm
 
-This creates a file called `crm.json`.
+This creates a file called `crm.json` in the current directory. You can change the path to that file using the `DATABASE_JSON_FILE` environment variable (example: `DATABASE_JSON_FILE=/home/user/crm.json`)
 
 The full list of commands supported by the tool is available by just entering
 `crm` on the command line.
@@ -71,6 +71,22 @@ Available commands:
     init-crm ........ create data file in current directory.
 
 ```
+
+## Non-local usage
+
+CRM cli features client server architecture.
+
+You can launch a server:
+
+   HOSTNAME=127.0.0.1 PORT=3000 DATABASE_URL=file://database.json crm server
+
+Then connect the CRM client to the server:
+
+   export DATABASE_URL=http://127.0.0.1:3000
+   # reset the database, or do whatever
+   crm init-crm
+
+Notice that the CRM server doesn't feature any kind of authentication, protection, SSL support, nothing. So it's strongly recommended you expose it only locally and expose it through a proxy, until that aspect is improved.
 
 ## Note on filters
 

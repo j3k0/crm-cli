@@ -3,7 +3,7 @@ import * as fs from 'fs';
 import { DatabaseSession } from "../../database";
 
 export async function templateHelp(database: DatabaseSession, arg: string) {
-  return { printAsText: () => console.log(`
+  return { printAsText: async () => console.log(`
 Here are the available template fields.
 
 {{EMAIL}} .............. Contact's raw email (example: user@example.com

@@ -47,7 +47,7 @@ export async function apps (database: DatabaseSession, filter?: string, delColum
 
     return {
         content: out,
-        printAsText: () => {
+        printAsText: async () => {
             const table = new Table( Object.assign(
                 {head: displayColumns},
                 defaultTableOptions));

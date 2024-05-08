@@ -39,11 +39,18 @@ Available commands:
  - system:
 
     init-crm ........ create data file in current directory.
+    server .......... launch a CRM server.
 
 
-Customize output with environment variables:
+Configure with environment variables:
 
   CSV=1 ............... output tables in pseudo csv.
+  PORT=1234 ........... set the port of the server "server" command only
+  DATABASE_URL ........ set the path to the database
+                        file://path/to-file.json - relative path to a JSON file
+                        file:///path/to-file.json - absolute path to a JSON file
+                        http://host:port - URL to a CRM server (see "server" command)
+                        memory:// - Non-persistent in-memory database (for tests)
 
 `);
 };
@@ -85,6 +92,7 @@ const commands = {
     'done': crmCli.followups.done,
     'template-help': crmCli.templates.help,
     template: crmCli.templates.run,
+    server: crmCli.server.run,
 };
 
 // Make sure --<command> and -<command> work too

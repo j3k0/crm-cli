@@ -125,7 +125,7 @@ export interface Printable {
 
 export interface PrintableArray<T> {
     content: T[];
-    printAsText: () => void;
+    printAsText: () => Promise<void>;
 }
 
 export interface Choice {

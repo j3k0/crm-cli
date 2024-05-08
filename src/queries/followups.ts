@@ -78,7 +78,7 @@ export async function followups(database: DatabaseSession, filter: string, delCo
   out = out.sort((a, b) => (+new Date(b.date)) - (+new Date(a.date)));
   return {
       content: out,
-      printAsText: () => {
+      printAsText: async () => {
           const table = new Table( Object.assign(
               {head: displayColumns},
               defaultTableOptions));

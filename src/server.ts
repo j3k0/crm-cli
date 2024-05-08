@@ -1,10 +1,11 @@
 import express from 'express';
 import Lib from './lib';
-import { connectDatabase } from './database';
+import { DatabaseAdapter, connectDatabase } from './database';
 import { emptyDatabase } from './database/emptyDatabase';
 
 export async function createServer() {
   const app = express();
+  const hostname = process.env.HOSTNAME || '0.0.0.0';
   const port = parseInt(process.env.PORT || '3954');
   const database = await connectDatabase();
 
@@ -361,7 +362,7 @@ export async function createServer() {
   });
 
   // Start the server
-  app.listen(port, () => {
+  app.listen(port, hostname, () => {
     console.log(`CRM API server running at http://localhost:${port}`);
   });
 }
