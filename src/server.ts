@@ -1,12 +1,14 @@
 import express from 'express';
 import Lib from './lib';
-import { DatabaseAdapter, connectDatabase } from './database';
+import { connectDatabase } from './database';
 import { emptyDatabase } from './database/emptyDatabase';
+import { randomUUID } from 'crypto';
 
 export async function createServer() {
   const app = express();
   const hostname = process.env.HOSTNAME || 'localhost';
   const port = parseInt(process.env.PORT || '3954');
+  const apiKey = process.env.SERVER_API_KEY || randomUUID().replace(/-/g, '');
   const database = await connectDatabase();
 
   app.use(express.json());
@@ -80,6 +82,33 @@ export async function createServer() {
     await database.create(data);
     const session = await database.open();
     res.json(await session.loadConfig());
+  });
+
+  app.use(async function authenticateRequest(req, res, next) {
+    const authHeader = req.headers.authorization;
+
+    if (authHeader && authHeader === apiKey) {
+      // authHeader set to the api key
+      return next();
+    }
+    else if (authHeader && authHeader.startsWith('Basic ')) {
+      // username or password set to the api key
+      // Remove 'Basic ' from the header
+      const base64Credentials = authHeader.substring(6);
+      // Decode the Base64 string
+      const credentials = Buffer.from(base64Credentials, 'base64').toString('utf-8');
+      // Split the decoded string into username and password
+      const [username, password] = credentials.split(':', 2);
+
+      // Continue with your authentication logic here
+      if (username === apiKey || password === apiKey) {
+        return next();
+      }
+    }
+    res
+      .header('WWW-Authenticate', `Basic realm="CRM Server"`)
+      .status(401)
+      .json({ error: 'Unauthorized' });
   });
 
   // Open a database session when request starts
@@ -367,7 +396,13 @@ export async function createServer() {
 
   // Start the server
   app.listen(port, hostname, () => {
-    console.log(`CRM API server running at http://${hostname}:${port}`);
+    const url = `http://admin:${apiKey}@${hostname}:${port}`;
+    console.log(`CRM API server running at ${url}\n`
+      + `\n`
+      + `Test some endpoints:\n`
+      + ` - ${url}/config\n`
+      + ` - ${url}/companies\n`
+    );
   });
 }
 

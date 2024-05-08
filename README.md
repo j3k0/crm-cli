@@ -78,15 +78,23 @@ CRM cli features client server architecture.
 
 You can launch a server:
 
-   HOSTNAME=127.0.0.1 PORT=3000 DATABASE_URL=file://database.json crm server
+```sh
+export SERVER_API_KEY=myapikey
+export HOSTNAME=127.0.0.1 # that's the default
+export PORT=3000
+export DATABASE_URL=file://database.json
+crm server
+```
 
 Then connect the CRM client to the server:
 
-   export DATABASE_URL=http://127.0.0.1:3000
-   # reset the database, or do whatever
-   crm init-crm
+```sh
+export DATABASE_URL=http://myapikey@127.0.0.1:3000
+# reset the database, or do whatever
+crm init-crm
+```
 
-Notice that the CRM server doesn't feature any kind of authentication, protection, SSL support, nothing. So it's strongly recommended you expose it only locally and expose it through a proxy, until that aspect is improved.
+Notice that the CRM server doesn't support SSL, so it's strongly recommended you only expose it through a reverse proxy.
 
 ## Note on filters
 
