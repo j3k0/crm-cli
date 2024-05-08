@@ -139,8 +139,8 @@ export async function createServer() {
     res.json((await req.session.dump()).companies);
   });
 
-  app.get('/companies/find/:name', async function getFindCompanies(req, res) {
-    console.log(`GET /companies/find/${req.params.name}`);
+  app.get('/companies/:name', async function getFindCompanies(req, res) {
+    console.log(`GET /companies/${req.params.name}`);
     const company = await req.session.findCompanyByName(req.params.name);
     res.json(company);
   });
@@ -363,12 +363,14 @@ export async function createServer() {
   });
 
   app.put('/config', async function putConfig(req, res) {
+    console.log('PUT /config');
     const attributes = req.body;
     const config = await Lib.editConfig(req.session, attributes);
     res.json(config);
   });
 
   app.get('/config', async function getConfig(req, res) {
+    console.log('GET /config');
     const session = await database.open();
     const config = await session.loadConfig();
     res.json(config);
@@ -376,11 +378,13 @@ export async function createServer() {
   });
 
   app.get('/config/staff', async function getConfigStaff(req, res) {
-    const staff = (await (await database.open()).loadConfig()).staff
+    console.log('GET /config/staff');
+    const staff = (await (await database.open()).loadConfig()).staff;
     res.json(staff);
   });
 
   app.post('/config/staff', async function postConfigStaff(req, res) {
+    console.log('POST /config/staff');
     const newStaff = req.body; // format: { "name": "User Full Name", "email": "email@domain.com" }
     const added = await Lib.addStaff(req.session, newStaff);
     if ('error' in added) {

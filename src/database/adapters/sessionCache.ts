@@ -1,14 +1,14 @@
-import { App, Company, CompanyAttributes, Config, Contact, Database } from "../types";
-import { emptyDatabase } from "./emptyDatabase";
-import { InMemoryDatabaseSession } from "./inMemoryDatabase";
-import { DatabaseSession } from "./types";
+import { App, Company, CompanyAttributes, Config, Contact, Database } from "../../types";
+import { emptyDatabase } from "../emptyDatabase";
+import { InMemorySession } from "./inMemory";
+import { DatabaseSession } from "../types";
 
 export class DatabaseSessionCache implements DatabaseSession {
 
   session: DatabaseSession;
   config?: Config;
   companies: Company[];
-  memory: InMemoryDatabaseSession;
+  memory: InMemorySession;
 
   /** True if the cache is complete with all data from the database */
   isDump: boolean;
@@ -19,10 +19,10 @@ export class DatabaseSessionCache implements DatabaseSession {
     this.companies = [];
 
     // Used for querying the cache
-    this.memory = new InMemoryDatabaseSession(emptyDatabase());
+    this.memory = new InMemorySession(emptyDatabase());
   }
 
-  private updateMemory():InMemoryDatabaseSession {
+  private updateMemory():InMemorySession {
     this.memory.database.companies = this.companies || [];
     return this.memory;
   }
@@ -46,7 +46,6 @@ export class DatabaseSessionCache implements DatabaseSession {
 
   dumpPromise: Promise<Database> | undefined;
   async dump(): Promise<Database> {
-    console.log('> DatabaseSessionCache.dump');
     if (this.dumpPromise) return this.dumpPromise;
     if (this.isDump && this.config && this.companies) {
       return { config: this.config, companies: this.companies }
@@ -57,7 +56,6 @@ export class DatabaseSessionCache implements DatabaseSession {
     this.config = dump.config;
     this.companies = dump.companies;
     this.isDump = true;
-    console.log('< DatabaseSessionCache.dump');
     return dump;
   }
 
@@ -111,17 +109,34 @@ export class DatabaseSessionCache implements DatabaseSession {
     return this.session.searchCompanies(filter);
   }
 
-  updateCompany(name: string, attributes: Partial<CompanyAttributes>): Promise<Company | { error: string; }> {
+  async updateCompany(name: string, attributes: Partial<CompanyAttributes>): Promise<Company | { error: string; }> {
+    let company = await this.findCompanyByName(name);
+    if (!company) { // this company doesn't exists
+      return { error: 'company not found' };
+    }
     this.clearCache();
-    return this.session.updateCompany(name, attributes);
+    return this.session.updateCompany(name, this.merge(attributes, company));
   }
 
   async updateConfig(attributes: Partial<Config>): Promise<Config | { error: string; }> {
+    let cache = this.config;
+    if (!cache) cache = await this.session.loadConfig();
     this.config = undefined;
     this.isDump = false;
-    const result = await this.session.updateConfig(attributes);
+    const result = await this.session.updateConfig(this.merge(attributes, cache));
     if ('error' in result) return result;
     this.config = result;
     return result;
+  }
+
+  private merge<T>(t: Partial<T>, cache: T): T;
+  private merge<T>(t: Partial<T>, cache: undefined): undefined;
+  private merge<T>(t: Partial<T>, cache: T | undefined): T | undefined {
+    if (!cache) return;
+    const ret:T = {
+      ...cache,
+      ...t
+    }
+    return ret;
   }
 }

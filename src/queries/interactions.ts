@@ -6,6 +6,7 @@ import { DatabaseSession } from "../database";
 
 export interface InteractionsResult {
   id?: number;
+  uuid?: string;
   company: Company["name"];
   kind: string;
   date: App["createdAt"] | '';
@@ -26,6 +27,7 @@ export async function interactions(database: DatabaseSession, filter?: string, d
       });
   }
   const data = await database.dump();
+//   console.log(JSON.stringify(data.companies, null, 2));
   data.companies.forEach((company) => {
       company.apps.forEach((app) => {
           out.push({

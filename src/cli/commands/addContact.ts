@@ -11,6 +11,7 @@ export async function addContact(database: DatabaseSession, filter: string | und
   console.log('');
   console.log('New Contact:');
   console.log('------------');
+//   console.log(JSON.stringify(data.companies));
   if (!values.company) Object.assign(contact, await enquirer.prompt({
       type: 'autocomplete',
       name: 'company',

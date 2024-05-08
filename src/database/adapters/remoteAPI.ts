@@ -1,12 +1,12 @@
-import { CrmClient, crmClient } from "../crmClient";
-import { App, Company, CompanyAttributes, Config, Contact, Database } from "../types";
-import { DatabaseSessionCache } from "./databaseSessionCache";
-import { DatabaseAdapter, DatabaseSession } from "./types";
+import { CrmClient, crmClient } from "../../crmClient";
+import { App, Company, CompanyAttributes, Config, Contact, Database } from "../../types";
+import { DatabaseSessionCache } from "./sessionCache";
+import { DatabaseAdapter, DatabaseSession } from "../types";
 
 /**
  * Use a remote CRM API server
  */
-export class RemoteDatabaseAdapter implements DatabaseAdapter {
+export class RemoteApiAdapter implements DatabaseAdapter {
 
   client: CrmClient;
 
@@ -19,11 +19,11 @@ export class RemoteDatabaseAdapter implements DatabaseAdapter {
   }
 
   async open(): Promise<DatabaseSession> {
-    return new DatabaseSessionCache(new RemoteDatabaseSession(this.client));
+    return new DatabaseSessionCache(new RemoteApiSession(this.client));
   }
 }
 
-export class RemoteDatabaseSession implements DatabaseSession {
+export class RemoteApiSession implements DatabaseSession {
 
   client: CrmClient;
 
@@ -38,9 +38,9 @@ export class RemoteDatabaseSession implements DatabaseSession {
   async close(): Promise<void> {}
 
   async dump(): Promise<Database> {
-    console.log('> RemoteDatabase.dump');
+    // console.log('> RemoteDatabase.dump');
     const ret = await this.client.dump();
-    console.log('< RemoteDatabase.dump');
+    // console.log('< RemoteDatabase.dump');
     return ret;
   }
 

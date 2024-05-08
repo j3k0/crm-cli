@@ -16,8 +16,8 @@ export async function about(database: DatabaseSession, filter: string, delColumn
   let out: About[] = [];
   const columns: (keyof About)[] = ['company', 'role', 'email'];
   const displayColumns = columns.filter((c) => !delColumns || delColumns.indexOf(c) < 0);
-  data.companies.forEach((company) => {
-      company.contacts.forEach((c) => {
+  (data.companies || []).forEach((company) => {
+      (company.contacts || []).forEach((c) => {
           const name = `${c.firstName} ${c.lastName}`.replace(/(^ )|( $)/g, '');
           out.push({
               company: company.name,
@@ -46,7 +46,7 @@ export async function about(database: DatabaseSession, filter: string, delColumn
               { head: displayColumns },
               defaultTableOptions));
           const companies: {[companyName: string]: boolean} = {};
-          out.forEach((line) => {
+          (out || []).forEach((line) => {
               companies[line.company] = true;
               table.push(displayColumns.map(cname => fieldToText(data, line, cname)));
           });

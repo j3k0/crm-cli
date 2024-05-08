@@ -1,10 +1,10 @@
-import { companies } from "../queries/companies";
-import { App, Company, CompanyAttributes, Config, Contact, Database } from "../types";
-import { emptyDatabase } from "./emptyDatabase";
-import { DatabaseAdapter, DatabaseSession } from "./types";
+import { companies } from "../../queries/companies";
+import { App, Company, CompanyAttributes, Config, Contact, Database } from "../../types";
+import { emptyDatabase } from "../emptyDatabase";
+import { DatabaseAdapter, DatabaseSession } from "../types";
 
 /** Non persistent database adapter where data is stored in memory */
-export class InMemoryDatabaseAdapter implements DatabaseAdapter {
+export class InMemoryAdapter implements DatabaseAdapter {
 
   database: Database;
 
@@ -17,12 +17,12 @@ export class InMemoryDatabaseAdapter implements DatabaseAdapter {
   }
 
   async open(): Promise<DatabaseSession> {
-    return new InMemoryDatabaseSession(this.database);
+    return new InMemorySession(this.database);
   }
 }
 
 
-export class InMemoryDatabaseSession implements DatabaseSession {
+export class InMemorySession implements DatabaseSession {
 
   database: Database;
   isModified: boolean;

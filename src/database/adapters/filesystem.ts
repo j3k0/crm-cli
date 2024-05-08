@@ -1,10 +1,10 @@
 import * as fs from 'fs';
-import { InMemoryDatabaseSession } from './inMemoryDatabase';
-import { Database } from '../types';
-import { DatabaseAdapter, DatabaseSession } from './types';
-import { emptyDatabase } from './emptyDatabase';
+import { InMemorySession } from './inMemory';
+import { Database } from '../../types';
+import { DatabaseAdapter, DatabaseSession } from '../types';
+import { emptyDatabase } from '../emptyDatabase';
 
-export class FileSystemDatabaseSession extends InMemoryDatabaseSession {
+export class FileSystemSession extends InMemorySession {
 
   path: string;
   autoCloseTimeout?: NodeJS.Timeout;
@@ -41,7 +41,7 @@ function trimPath(path: string): string {
   return path.replace(/\/$/, '');
 }
 
-export class FileSystemDatabaseAdapter implements DatabaseAdapter {
+export class FileSystemAdapter implements DatabaseAdapter {
 
   dataFullPath: string;
 
@@ -55,7 +55,7 @@ export class FileSystemDatabaseAdapter implements DatabaseAdapter {
           const data = JSON.parse(fileContent);
           if (Array.isArray(data)) {
               // old format
-              return new FileSystemDatabaseSession({
+              return new FileSystemSession({
                   companies: data,
                   config: emptyDatabase().config,
               }, this.dataFullPath);
@@ -66,7 +66,7 @@ export class FileSystemDatabaseAdapter implements DatabaseAdapter {
               if (!loaded.config?.subscriptionPlans) loaded.config.subscriptionPlans = emptyDatabase().config.subscriptionPlans;
               if (!loaded.config?.staff) loaded.config.staff = {};
               if (!loaded.config?.interactions) loaded.config.interactions = emptyDatabase().config.interactions;
-              return new FileSystemDatabaseSession(data as Database, this.dataFullPath);
+              return new FileSystemSession(data as Database, this.dataFullPath);
           }
       }
       catch (err) {

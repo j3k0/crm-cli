@@ -1,12 +1,16 @@
-import { FileSystemDatabaseAdapter } from './filesystemDatabase';
+import { FileSystemAdapter } from './adapters/filesystem';
 import { DatabaseAdapter } from './types';
-import { InMemoryDatabaseAdapter } from './inMemoryDatabase';
+import { InMemoryAdapter } from './adapters/inMemory';
 import { emptyDatabase } from './emptyDatabase';
-import { RemoteDatabaseAdapter } from './remoteDatabase';
+import { RemoteApiAdapter } from './adapters/remoteAPI';
+import { CouchDBAdapter } from './adapters/couchdb';
 
 export type DatabaseConnectParsedOptions = {
     type: "filesystem";
     path: string;
+} | {
+    type: "couchdb";
+    url: string;
 } | {
     type: "memory";
 } | {
@@ -45,6 +49,10 @@ function parseOptions(options?: DatabaseConnectOptions): DatabaseConnectParsedOp
             type: "remote",
             url: options,
         }
+        case "couchdb:": case "couchdbs:": return {
+            type: "couchdb",
+            url: options.replace(/^couchdb/, 'http')
+        }
         default:
             throw new Error("invalid database URL: " + options);
     }
@@ -54,11 +62,13 @@ export async function connectDatabase(options?: DatabaseConnectOptions): Promise
     options = parseOptions(options);
     switch (options.type) {
         case "memory":
-            return new InMemoryDatabaseAdapter(emptyDatabase());
+            return new InMemoryAdapter(emptyDatabase());
         case "filesystem":
-            return new FileSystemDatabaseAdapter(options.path);
+            return new FileSystemAdapter(options.path);
         case "remote":
-            return new RemoteDatabaseAdapter(options.url);
+            return new RemoteApiAdapter(options.url);
+        case "couchdb":
+            return new CouchDBAdapter(options.url);
     }
 }
 

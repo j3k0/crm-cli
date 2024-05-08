@@ -31,7 +31,7 @@ export class CrmClient {
 
   async findCompany(name: string): Promise<CompanyAttributes | undefined> {
     try {
-      const response = await axios.get(`${this.baseUrl}/companies/find/${encodeURIComponent(name)}`);
+      const response = await axios.get(`${this.baseUrl}/companies/${encodeURIComponent(name)}`);
       return response.data;
     } catch (error) {
       console.error('Error fetching company:', error);

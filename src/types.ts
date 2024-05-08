@@ -1,14 +1,3 @@
-// export type InteractionKind =
-//     | 'system'
-//     | 'email'
-//     | 'github'
-//     | 'contact-form'
-//     | 'phone'
-//     | 'real-life'
-//     | 'linkedin'
-//     | 'none'
-// ;
-
 export interface Config {
     subscriptionPlans: string[];
     staff: { [email: string]: string };
@@ -85,9 +74,9 @@ export class Company implements CompanyAttributes {
         this.name = data.name;
         this.address = data.address;
         this.url = data.url;
-        this.contacts = data.contacts;
-        this.apps = data.apps;
-        this.interactions = data.interactions;
+        this.contacts = data.contacts || [];
+        this.apps = data.apps || [];
+        this.interactions = data.interactions || [];
         this.noFollowUp = data.noFollowUp;
         this.createdAt = data.createdAt;
         this.updatedAt = data.updatedAt;

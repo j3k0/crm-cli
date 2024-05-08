@@ -1,6 +1,5 @@
 import { DatabaseSession } from "./database";
-import { findApp, findAppByName, findCompany, findCompanyByName, findContact } from "./queries/requests";
-import { App, Company, CompanyAttributes, Config, Contact, Database, Interaction } from "./types";
+import { App, Company, CompanyAttributes, Config, Contact, Interaction } from "./types";
 
 export async function addCompany(database: DatabaseSession, company: Partial<CompanyAttributes>): Promise<Company | {}> {
 
