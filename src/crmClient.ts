@@ -1,6 +1,8 @@
 import axios from 'axios';
 import { App, Company, CompanyAttributes, Config, Contact, Database } from './types';
 
+export * from "./types";
+
 export class CrmClient {
   baseUrl: string;
 
