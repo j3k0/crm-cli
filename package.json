@@ -1,6 +1,6 @@
 {
   "name": "crm-cli",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "Customers Relationship Management from your Terminal",
   "main": "build/crmClient.js",
   "types": "build/crmClient.d.ts",
