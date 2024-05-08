@@ -96,6 +96,19 @@ crm init-crm
 
 Notice that the CRM server doesn't support SSL, so it's strongly recommended you only expose it through a reverse proxy.
 
+## Docker
+
+You can run the server with docker.
+
+```sh
+docker build -t crm-cli .
+docker run -p 8000:80 --rm -it crm-cli
+```
+
+By default it will use a local `crm.json` file stored in a volume mounted in `/app/data`.
+
+You can customize the database with the `DATABASE_URL` environment variable.
+
 ## Note on filters
 
 All reports commands accepts a filter argument, used to restrict the data display.
