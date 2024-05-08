@@ -1,5 +1,4 @@
 import Fuse from "fuse.js";
-import { Database } from "../types";
 import { defaultTableOptions, fieldToText, tableToString } from "../cli/table";
 import Table from "cli-table";
 import { apps } from "./apps";

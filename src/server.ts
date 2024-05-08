@@ -1,11 +1,7 @@
 import express from 'express';
-import { companies } from './queries/companies';
 import Lib from './lib';
-import { contacts } from './queries/contacts';
-import { interactions } from './queries/interactions';
-import { apps } from './queries/apps';
-import { findAppByName, findCompanyByName, findContact } from './queries/requests';
-import { connectDatabase, emptyDatabase } from './database';
+import { connectDatabase } from './database';
+import { emptyDatabase } from './database/emptyDatabase';
 
 export async function createServer() {
   const app = express();
