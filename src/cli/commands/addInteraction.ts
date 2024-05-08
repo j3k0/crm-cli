@@ -147,6 +147,6 @@ export async function addInteraction(database: DatabaseSession, filter: string |
   }
   return {
       ...interaction,
-      printAsText: () => { },
+      printAsText: async () => { },
   }
 };

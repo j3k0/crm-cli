@@ -40,7 +40,7 @@ export async function about(database: DatabaseSession, filter: string, delColumn
 
   return {
       ...out,
-      printAsText: () => {
+      printAsText: async () => {
 
           const table = new Table(Object.assign(
               { head: displayColumns },
@@ -52,12 +52,12 @@ export async function about(database: DatabaseSession, filter: string, delColumn
           });
           console.log('\nContacts:');
           console.log(tableToString(table));
-          Object.keys(companies).forEach(async (company) => {
+          for (const company of Object.keys(companies)) {
               console.log(`\nApps from ${company}:`);
               (await apps(database, company, ['company'])).printAsText();
               console.log(`\nInteractions with ${company}:`);
               (await interactions(database, company, ['company'])).printAsText();
-          });
+          }
       }
   };
 };

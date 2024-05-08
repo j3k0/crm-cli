@@ -59,6 +59,6 @@ export async function addContact(database: DatabaseSession, filter: string | und
       console.error(`ERROR: Company with name "${companyName}" doesn't exists.`);
       process.exit(1);
   }
-  contact.printAsText = () => {};
+  contact.printAsText = async () => {};
   return contact as (Contact & Printable);
 };

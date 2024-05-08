@@ -13,6 +13,7 @@ export class FileSystemDatabaseSession extends InMemoryDatabaseSession {
       super(database);
       this.path = path;
       this.autoCloseTimeout = setTimeout(() => {
+          console.log("FileSystemDatabaseSession.autoClose(timeout reached)");
           this.autoCloseTimeout = undefined;
           this.close();
       }, 10000); // auto-close after 10s
@@ -25,7 +26,7 @@ export class FileSystemDatabaseSession extends InMemoryDatabaseSession {
           this.autoCloseTimeout = undefined;
       }
       if (this.isModified) {
-          // console.log("FileSystemDatabaseSession.close() > save to disk");
+          console.log("FileSystemDatabaseSession.close() > save to disk");
           this.isModified = false;
           // first backup the file
           await fs.promises.copyFile(`${this.path}`, `${this.path}.bak`);
@@ -35,12 +36,17 @@ export class FileSystemDatabaseSession extends InMemoryDatabaseSession {
   }
 }
 
+function trimPath(path: string): string {
+  // remove final "/"
+  return path.replace(/\/$/, '');
+}
+
 export class FileSystemDatabaseAdapter implements DatabaseAdapter {
 
   dataFullPath: string;
 
   constructor(dataFullPath: string) {
-      this.dataFullPath = dataFullPath;
+      this.dataFullPath = trimPath(dataFullPath);
   }
 
   async open(): Promise<DatabaseSession> {

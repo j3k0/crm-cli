@@ -33,6 +33,6 @@ export async function editCompany(database: DatabaseSession, filter?: string): P
   console.log('Company updated.');
   return {
       ...company,
-      printAsText: () => {}
+      printAsText: async () => {}
   }
 };

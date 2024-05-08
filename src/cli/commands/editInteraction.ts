@@ -41,13 +41,13 @@ export async function editInteraction(database: DatabaseSession, filter?: string
   }
   if (!interaction) {
       return {
-          printAsText: () => {},
+          printAsText: async () => {},
       };
   }
   else {
       return {
           ...interaction,
-          printAsText: () => {},
+          printAsText: async () => {},
       };
   }
 };

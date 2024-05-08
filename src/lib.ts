@@ -28,14 +28,10 @@ export async function addCompany(database: DatabaseSession, company: Partial<Com
 }
 
 export async function editCompany(database: DatabaseSession, name: string, attributes: Partial<CompanyAttributes>): Promise<Company | {error: string}> {
-    // If name is filled and there isn't a company with the given name.
-    // Add it and save
     if (!name) {
       return {error: 'missing name'};
     }
-    // const company = await database.findCompanyByName(name);
     const company = await database.updateCompany(name, attributes);
-    console.log('Company updated.');
     return company;
 }
 

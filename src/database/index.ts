@@ -2,12 +2,16 @@ import { FileSystemDatabaseAdapter } from './filesystemDatabase';
 import { DatabaseAdapter } from './types';
 import { InMemoryDatabaseAdapter } from './inMemoryDatabase';
 import { emptyDatabase } from './emptyDatabase';
+import { RemoteDatabaseAdapter } from './remoteDatabase';
 
 export type DatabaseConnectParsedOptions = {
     type: "filesystem";
     path: string;
 } | {
     type: "memory";
+} | {
+    type: "remote";
+    url: string;
 };
 
 export type DatabaseConnectOptions = DatabaseConnectParsedOptions | string;
@@ -37,6 +41,10 @@ function parseOptions(options?: DatabaseConnectOptions): DatabaseConnectParsedOp
         case "memory:": return {
             type: "memory"
         }
+        case "http:": case "https:": return {
+            type: "remote",
+            url: options,
+        }
         default:
             throw new Error("invalid database URL: " + options);
     }
@@ -49,6 +57,8 @@ export async function connectDatabase(options?: DatabaseConnectOptions): Promise
             return new InMemoryDatabaseAdapter(emptyDatabase());
         case "filesystem":
             return new FileSystemDatabaseAdapter(options.path);
+        case "remote":
+            return new RemoteDatabaseAdapter(options.url);
     }
 }
 

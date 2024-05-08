@@ -10,15 +10,87 @@ export async function createServer() {
 
   app.use(express.json());
 
+  /**
+   * Resets the database with the provided data, merging it with the default empty database structure.
+   * 
+   * This is useful for initializing the database with a clean state.
+   *
+   * @api {post} /reset Reset the database
+   * @apiName ResetDatabase
+   * @apiGroup Database
+   *
+   * @apiParam {Object} requestBody Initial database structure.
+   * @apiParamExample {json} Request-Example:
+   * {
+   *   "companies": [
+   *     {
+   *       "name": "Example Company",
+   *       "url": "https://example.com",
+   *       "contacts": [
+   *         {
+   *           "email": "contact@example.com",
+   *           "role": "CEO"
+   *         }
+   *       ],
+   *       "apps": [
+   *         {
+   *           "appName": "Example App",
+   *           "plan": "Premium",
+   *           "email": "app@example.com"
+   *         }
+   *       ]
+   *     }
+   *   ],
+   *   "config": {
+   *     "subscriptionPlans": ["Free", "Premium"],
+   *     "staff": {
+   *       "john@example.com": "John Doe"
+   *     },
+   *     "interactions": {
+   *       "kinds": ["email", "phone"],
+   *       "tags": ["urgent", "follow-up"]
+   *     }
+   *   }
+   * }
+   *
+   * @apiSuccess {Object} config The configuration of the database after resetting.
+   * @apiSuccessExample {json} Success-Response:
+   * {
+   *   "subscriptionPlans": ["Free", "Premium"],
+   *   "staff": {
+   *     "john@example.com": "John Doe"
+   *   },
+   *   "interactions": {
+   *     "kinds": ["email", "phone"],
+   *     "tags": ["urgent", "follow-up"]
+   *   }
+   * }
+   *
+   * @apiError (500) {String} message An error message indicating the failure to reset the database.
+   *
+   * @apiExample {curl} Example usage:
+   *     curl -X POST -H "Content-Type: application/json" -d @requestBody.json http://localhost:3954/reset
+   */
   app.post('/reset', async function postReset(req, res) {
-    await database.create(emptyDatabase());
+    const data = {
+      ...emptyDatabase(),
+      ...req.body
+    };
+    await database.create(data);
     const session = await database.open();
     res.json(await session.loadConfig());
   });
 
-  // Open a database session
-  app.use(async function(req, res, next) {
+  // Open a database session when request starts
+  // Close it when it ends
+  app.use(async function openDatabaseSession(req, res, next) {
     req.session = await database.open();
+      // Close database session
+      res.on('finish', async function closeDatabaseSessionOnFinish() {
+        if (req.session) {
+          req.session.close();
+        }
+      });
     next();
   });
 
@@ -27,6 +99,15 @@ export async function createServer() {
   //     rows: await req.session.searchCompanies(req.params.filter).content
   //   });
   // });
+
+  app.get('/dump', async function getDump(req, res) {
+    console.log(`GET /dump`);
+    res.json(await req.session.dump());
+  });
+
+  app.get('/companies', async function getAllCompanies(req, res) {
+    res.json((await req.session.dump()).companies);
+  });
 
   app.get('/companies/find/:name', async function getFindCompanies(req, res) {
     console.log(`GET /companies/find/${req.params.name}`);
@@ -38,20 +119,19 @@ export async function createServer() {
     const newCompany = req.body; // Assuming the request body contains the new app data
     if ('name' in newCompany) {
       const company = await Lib.addCompany(req.session, newCompany);
-      res.json({
-        message: 'Company added successfully',
-        company,
-      });
+      res.json(company);
     }
     else {
       res.status(400).json({
-        message: 'Failed to add company'
+        error: 'Failed to add company'
       });
     }
   });
 
   app.put('/companies/:name', async function putCompanies(req, res) {
+    console.log(`PUT /companies/${req.params.name}`);
     const newCompany = req.body; // Assuming the request body contains the new app data
+    console.log(JSON.stringify(newCompany, null, 4));
     const name = req.params.name;
     if (name && !newCompany.name || (name === newCompany.name)) {
       const company = await Lib.editCompany(req.session, name, newCompany);
@@ -116,9 +196,8 @@ export async function createServer() {
   // });
 
   // GET endpoint to retrieve a contact by email
-  app.get('/contacts/find/:email', async function getFindContacts(req, res) {
+  app.get('/contacts/by-email/:email', async function getFindContacts(req, res) {
     res.json(await req.session.findContactByEmail(req.params.email));
-    // res.json(findContact(await loadData("all"), req.params.email)?.contact);
   });
 
   // POST endpoint to create a new contact
@@ -177,13 +256,29 @@ export async function createServer() {
   // });
 
   // GET endpoint to retrieve an app
-  app.get('/apps/find/:appName', async function getFindApps(req, res) {
+  app.get('/apps/by-name/:appName', async function getFindApps(req, res) {
     const appName = req.params.appName;
     if (!appName) {
       res.status(400).json({ message: '"appName" is missing' });
       return;
     }
     const result = await req.session.findAppByName(appName);
+    if (!result) {
+      return res.status(404);
+    }
+    res.json({
+      ...result.app,
+      company: result.company.name,
+    });
+  });
+
+  app.get('/apps/by-email/:email', async function getFindAppsByEmail(req, res) {
+    const email = req.params.email;
+    if (!email) {
+      res.status(400).json({ message: '"email" is missing' });
+      return;
+    }
+    const result = await req.session.findAppByEmail(email);
     if (!result) {
       return res.status(404);
     }
@@ -263,14 +358,6 @@ export async function createServer() {
         staff: added,
       });
     }
-  });
-
-  // Close database session
-  app.use(async function(req, res, next) {
-    if (req.session) {
-      await req.session.close();
-    }
-    next();
   });
 
   // Start the server

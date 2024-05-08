@@ -36,6 +36,6 @@ export async function addCompany(database: DatabaseSession, filter: string | und
   }
   return {
       ...ret,
-      printAsText: () => { },
+      printAsText: async () => { },
   }
 }

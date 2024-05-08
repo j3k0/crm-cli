@@ -33,6 +33,6 @@ export async function editContact(database: DatabaseSession, filter: string): Pr
   console.log('Contact updated.');
   return {
       ...contact,
-      printAsText: () => { }
+      printAsText: async () => { }
   };
 };

@@ -112,9 +112,9 @@ async function main() {
     try {
         const session = await database.open();
         const report = await command(session, filter);
-        await session.close();
         if (report && report.printAsText)
-            report.printAsText();
+            await report.printAsText();
+        await session.close();
     }
     catch (e) {
         console.error(e);

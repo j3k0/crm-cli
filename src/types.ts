@@ -120,7 +120,7 @@ export class Company implements CompanyAttributes {
 }
 
 export interface Printable {
-    printAsText: () => void;
+    printAsText: () => Promise<void>;
 }
 
 export interface PrintableArray<T> {
