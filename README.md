@@ -101,8 +101,13 @@ Notice that the CRM server doesn't support SSL, so it's strongly recommended you
 You can run the server with docker.
 
 ```sh
-docker build -t crm-cli .
-docker run -p 8000:80 --rm -it crm-cli
+docker run -p 8000:80 --rm -it jeko/crm-server
+```
+
+To build the image:
+
+```sh
+docker build -t jeko/crm-server .
 ```
 
 By default it will use a local `crm.json` file stored in a volume mounted in `/app/data`.
