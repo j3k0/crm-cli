@@ -31,7 +31,7 @@ export async function template(database: DatabaseSession, arg: string) {
       throw 'Usage: crm template <TEMPLATE_FILE> <filter>'
   if (!fs.existsSync(fileName))
       throw `ERROR: ${fileName} does not exists.`;
-  let content = fs.readFileSync(fileName, {encoding:'utf-8'});
+  let content = await fs.promises.readFile(fileName, {encoding:'utf-8'});
 
 //   const filteredApp: AppResult[] = apps(data, filter).content;
 //   const filteredContact: ContactsResult[] = contacts(data, filter).content;
@@ -68,11 +68,11 @@ export async function template(database: DatabaseSession, arg: string) {
       content = content.replace(new RegExp('{{COMPANY_ADDRESS}}', 'g'), company.address || '');
   }
   return {
-      printAsText: () => console.log(content)
+      printAsText: async () => console.log(content)
   };
 }
 async function findEntities(database: DatabaseSession, filter: string) {
-    const app = await database.findAppByName(filter) || await database.findAppByEmail(filter);
+    const app = (await database.findAppByName(filter)) || (await database.findAppByEmail(filter));
 
     // If any results are non-ambiguous
     if (app) {

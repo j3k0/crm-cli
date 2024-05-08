@@ -44,27 +44,40 @@ export class RemoteDatabaseSession implements DatabaseSession {
     return ret;
   }
 
-  async findAppByName(appName: string): Promise<{ company: Company; app: App; } | undefined> {
-    const app = await this.client.findAppByName(appName);
-    if (app)
-      return { app, company: await this.companyOf(app) };
+  private async catch404<T, U>(call: Promise<T | undefined>, transform: (t: T) => Promise<U>): Promise<U | undefined> {
+    try {
+      const value = await call;
+      if (!value) return;
+      return await transform(value);
+    }
+    catch (err) {
+      if ((err as any)?.response?.status === 404) {
+        return undefined;
+      }
+      throw err;
+    }
   }
 
-  async findAppByEmail(email: string): Promise<{ company: Company; app: App; } | undefined> {
-    const app = await this.client.findAppByEmail(email);
-    if (app)
-      return { app, company: await this.companyOf(app) };
+  findAppByName(appName: string): Promise<{ company: Company; app: App; } | undefined> {
+    return this.catch404(this.client.findAppByName(appName), async (app) => ({
+      app, company: await this.companyOf(app) 
+    }));
   }
 
-  async findCompanyByName(name: string): Promise<Company | undefined> {
-    const attributes = await this.client.findCompany(name);
-    if (attributes) return new Company(attributes);
+  findAppByEmail(email: string): Promise<{ company: Company; app: App; } | undefined> {
+    return this.catch404(this.client.findAppByEmail(email), async app => ({
+      app, company: await this.companyOf(app),
+    }));
   }
 
-  async findContactByEmail(email: string): Promise<{ company: Company; contact: Contact; } | undefined> {
-    const contact = await this.client.findContactByEmail(email);
-    if (contact)
-      return { contact, company: await this.companyOf(contact) }
+  findCompanyByName(name: string): Promise<Company | undefined> {
+    return this.catch404(this.client.findCompany(name), async company => new Company(company));
+  }
+
+  findContactByEmail(email: string): Promise<{ company: Company; contact: Contact; } | undefined> {
+    return this.catch404(this.client.findContactByEmail(email), async contact => ({
+      contact, company: await this.companyOf(contact)
+    }));
   }
 
   async loadConfig(): Promise<Config> {

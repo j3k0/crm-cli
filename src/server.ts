@@ -5,7 +5,7 @@ import { emptyDatabase } from './database/emptyDatabase';
 
 export async function createServer() {
   const app = express();
-  const hostname = process.env.HOSTNAME || '0.0.0.0';
+  const hostname = process.env.HOSTNAME || 'localhost';
   const port = parseInt(process.env.PORT || '3954');
   const database = await connectDatabase();
 
@@ -198,11 +198,13 @@ export async function createServer() {
 
   // GET endpoint to retrieve a contact by email
   app.get('/contacts/by-email/:email', async function getFindContacts(req, res) {
+    console.log('GET /contacts/by-email/' + req.params.email);
     res.json(await req.session.findContactByEmail(req.params.email));
   });
 
   // POST endpoint to create a new contact
   app.post('/contacts', async function postContacts(req, res) {
+    console.log('POST /contacts');
     const newContact = req.body; // Assuming the request body contains the new contact data
     const company = newContact.company;
     if (!company) {
@@ -258,6 +260,7 @@ export async function createServer() {
 
   // GET endpoint to retrieve an app
   app.get('/apps/by-name/:appName', async function getFindApps(req, res) {
+    console.log('GET /apps/by-name/' + req.params.appName);
     const appName = req.params.appName;
     if (!appName) {
       res.status(400).json({ message: '"appName" is missing' });
@@ -265,7 +268,7 @@ export async function createServer() {
     }
     const result = await req.session.findAppByName(appName);
     if (!result) {
-      return res.status(404);
+      return res.status(404).json({ error: 'app not found' });
     }
     res.json({
       ...result.app,
@@ -274,6 +277,7 @@ export async function createServer() {
   });
 
   app.get('/apps/by-email/:email', async function getFindAppsByEmail(req, res) {
+    console.log('GET /apps/by-email/' + req.params.email);
     const email = req.params.email;
     if (!email) {
       res.status(400).json({ message: '"email" is missing' });
@@ -281,7 +285,7 @@ export async function createServer() {
     }
     const result = await req.session.findAppByEmail(email);
     if (!result) {
-      return res.status(404);
+      return res.status(404).json({ error: 'app not found' });
     }
     res.json({
       ...result.app,
@@ -363,7 +367,7 @@ export async function createServer() {
 
   // Start the server
   app.listen(port, hostname, () => {
-    console.log(`CRM API server running at http://localhost:${port}`);
+    console.log(`CRM API server running at http://${hostname}:${port}`);
   });
 }
 

@@ -96,7 +96,7 @@ The filter is a fuzzy case-insensitive operator.
 
 Examples:
 
- * `crm about microsft` will show all data you have about `Microsoft`.
+ * `crm about microsoft` will show all data you have about `Microsoft`.
  * `crm about marc twain` will show all data you have about `Marc Twain`.
 
 ## Best practices
