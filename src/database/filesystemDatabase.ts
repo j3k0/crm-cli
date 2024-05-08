@@ -70,6 +70,12 @@ export class FileSystemDatabaseAdapter implements DatabaseAdapter {
           }
       }
       catch (err) {
+          if ((err as any)?.code === 'ENOENT') {
+              // File does not exists, let's create it.
+              await this.create(emptyDatabase());
+              console.info(`Database file created.`);
+              return await this.open();
+          }
           if (err instanceof Error) {
               console.error(`ERROR #${err.name}: ${err.message}.`);
           }
