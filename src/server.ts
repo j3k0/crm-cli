@@ -11,7 +11,7 @@ export async function createServer() {
   const apiKey = process.env.SERVER_API_KEY || randomUUID().replace(/-/g, '');
   const database = await connectDatabase();
 
-  app.use(express.json());
+  app.use(express.json({ limit: '1024mb' }));
 
   app.use(async function authenticateRequest(req, res, next) {
     const authHeader = req.headers.authorization;
