@@ -1,15 +1,15 @@
-import { saveData } from "../../database";
 import { editJson } from "../editor";
 import { findCompany } from "../../queries/requests";
 import { Company, CompanyAttributes, Database, Printable } from "../../types";
 import { doYouConfirm } from "../utils";
+import { DatabaseSession } from "../../database";
 
-export async function editCompany(data: Database, filter?: string): Promise<(CompanyAttributes & Printable) | undefined> {
+export async function editCompany(database: DatabaseSession, filter?: string): Promise<(CompanyAttributes & Printable) | undefined> {
   if (!filter) {
       console.log('Usage: crm edit-company NAME');
       process.exit(1);
   }
-  const company = findCompany(data, filter); // fuzzy search for the company
+  const company = await database.findCompanyByName(filter) ?? (await database.searchCompanies(filter))[0];
   if (!company)
       return;
   const edited = await editJson<Partial<Company>>({
@@ -29,7 +29,7 @@ export async function editCompany(data: Database, filter?: string): Promise<(Com
   await doYouConfirm(JSON.stringify(edited, null, 4));
   Object.assign(company, edited);
   company.updatedAt = new Date().toISOString();
-  await saveData(data, { company: company.name });
+  await database.updateCompany(company.name, company);
   console.log('Company updated.');
   return {
       ...company,

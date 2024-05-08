@@ -4,8 +4,10 @@ import { doYouConfirm } from '../utils';
 import { addCompany } from './addCompany';
 import { addContact } from './addContact';
 import Lib from '../../lib';
+import { DatabaseSession } from '../../database';
 
-export const addApp = async (data: Database, filter: string, values: Partial<App & {company?: string}> = {}) => {
+export const addApp = async (database: DatabaseSession, filter: string, values: Partial<App & {company?: string}> = {}) => {
+  const data = await database.dump();
   console.log('');
   console.log('New App:');
   console.log('--------');
@@ -62,17 +64,17 @@ export const addApp = async (data: Database, filter: string, values: Partial<App
   await doYouConfirm();
 
   if (app.company === 'new_company') {
-      const newCompany = await addCompany(data, undefined);
+      const newCompany = await addCompany(database, undefined);
       if ('name' in newCompany)
         app.company = newCompany.name;
   }
 
   if (app.email === 'new_contact') {
-      const newContact = await addContact(data, undefined, {company: app.company});
+      const newContact = await addContact(database, undefined, {company: app.company});
       app.email = newContact.email;
   }
 
-  const addedApp = Lib.addApp(data, app);
+  const addedApp = await Lib.addApp(database, app);
   if ('error' in addedApp) {
     process.exit(1);
   }

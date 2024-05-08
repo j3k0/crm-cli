@@ -4,6 +4,7 @@ import { defaultTableOptions, fieldToText, tableToString } from "../cli/table";
 import Table from "cli-table";
 import { apps } from "./apps";
 import { interactions } from "./interactions";
+import { DatabaseSession } from "../database";
 
 export interface About {
   company: string;
@@ -11,7 +12,8 @@ export interface About {
   email: string;
 }
 
-export function about(data: Database, filter: string, delColumns: (keyof About)[]) {
+export async function about(database: DatabaseSession, filter: string, delColumns: (keyof About)[]) {
+  const data = await database.dump();
   let out: About[] = [];
   const columns: (keyof About)[] = ['company', 'role', 'email'];
   const displayColumns = columns.filter((c) => !delColumns || delColumns.indexOf(c) < 0);
@@ -51,11 +53,11 @@ export function about(data: Database, filter: string, delColumns: (keyof About)[
           });
           console.log('\nContacts:');
           console.log(tableToString(table));
-          Object.keys(companies).forEach((company) => {
+          Object.keys(companies).forEach(async (company) => {
               console.log(`\nApps from ${company}:`);
-              apps(data, company, ['company']).printAsText();
+              (await apps(database, company, ['company'])).printAsText();
               console.log(`\nInteractions with ${company}:`);
-              interactions(data, company, ['company']).printAsText();
+              (await interactions(database, company, ['company'])).printAsText();
           });
       }
   };

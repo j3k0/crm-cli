@@ -1,11 +1,12 @@
-import { saveData } from "../../database";
 import { editJson } from "../editor";
 import { findInteraction } from "../../queries/requests";
-import { Database, Interaction, Printable } from "../../types";
+import { Interaction, Printable } from "../../types";
 import { doYouConfirm } from "../utils";
 import moment from "moment";
+import { DatabaseSession } from "../../database";
 
-export async function editInteraction(data: Database, filter?: string): Promise<(Interaction | {}) & Printable> {
+export async function editInteraction(database: DatabaseSession, filter?: string): Promise<(Interaction | {}) & Printable> {
+  const data = await database.dump();
   if (!filter) {
       console.log('Usage: crm edit-interaction ID');
       process.exit(1);
@@ -35,7 +36,7 @@ export async function editInteraction(data: Database, filter?: string): Promise<
           interaction.followUpDate = moment(interaction.followUpDate).toISOString();
       }
       interaction.updatedAt = new Date().toISOString();
-      await saveData(data, { company: findResult.company.name });
+      await database.updateCompany(findResult.company.name, findResult.company);
       console.log('Interaction updated.');
   }
   if (!interaction) {

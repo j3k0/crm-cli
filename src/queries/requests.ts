@@ -1,5 +1,5 @@
 import Fuse from "fuse.js";
-import { App, Company, CompanyAttributes, Contact, Database, Interaction } from "../types";
+import { App, Company, Contact, Database, Interaction } from "../types";
 
 export interface CompanyContact {
     contact: Contact;
@@ -21,8 +21,8 @@ export interface CompanyInteraction {
 }
 
 // Requests
-export const allContacts = (data: Database): CompanyContact[] =>
-    data.companies.reduce((acc, company: Company) => {
+export const allContacts = (companies: Database["companies"]): CompanyContact[] =>
+    companies.reduce((acc, company: Company) => {
         company.contacts.forEach((contact: Contact) => acc.push({
             contact,
             company,
@@ -65,8 +65,8 @@ function fuseFind<T> (keys: (keyof T)[], data: readonly T[], search?: string): T
     return searchResults[0];
 }
 
-export const findContact = (data: Database, search: string | undefined): { contact: Contact, company: Company } | undefined =>
-    fuseFind(['email', 'firstName', 'lastName'], allContacts(data), search);
+export const findContact = (companies: Company[], search: string | undefined): { contact: Contact, company: Company } | undefined =>
+    fuseFind(['email', 'firstName', 'lastName'], allContacts(companies), search);
 
 export const findCompany = (data: Database, search: string | undefined) =>
     fuseFind(['name'], data.companies, search);

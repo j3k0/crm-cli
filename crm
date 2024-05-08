@@ -95,21 +95,24 @@ Object.keys(commands).forEach((key) => {
 
 async function main() {
 
+    const database = await crmCli.data.connectDatabase();
     if (process.argv[2] === 'init-crm') {
-        await crmCli.data.init();
+        await database.create();
         console.log('Done.');
         process.exit(0);
     }
 
-    const data = await crmCli.data.load("all");
     const command = commands[process.argv[2]];
     if (!command) {
         help();
         process.exit(1);
     }
+
     const filter = process.argv.slice(3).join(' ');
     try {
-        const report = await command(data, filter);
+        const session = await database.open();
+        const report = await command(session, filter);
+        await session.close();
         if (report && report.printAsText)
             report.printAsText();
     }

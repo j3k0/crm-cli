@@ -1,12 +1,8 @@
 import moment from "moment";
-import { AppResult, apps } from "../../queries/apps";
-import { companies } from "../../queries/companies";
-import { ContactsResult, contacts } from "../../queries/contacts";
-import { findApp, findCompany, findContact } from "../../queries/requests";
-import { App, Company, Contact, Database } from "../../types";
 import * as fs from 'fs';
+import { DatabaseSession } from "../../database";
 
-export async function templateHelp(data: Database, arg: string) {
+export async function templateHelp(database: DatabaseSession, arg: string) {
   return { printAsText: () => console.log(`
 Here are the available template fields.
 
@@ -28,7 +24,7 @@ Here are the available template fields.
   `) };
 };
 
-export async function template(data: Database, arg: string) {
+export async function template(database: DatabaseSession, arg: string) {
   const [fileName, ...filterArray] = arg.split(' ');
   const filter = filterArray.join(' ');
   if (!fileName || !filter)
@@ -37,50 +33,11 @@ export async function template(data: Database, arg: string) {
       throw `ERROR: ${fileName} does not exists.`;
   let content = fs.readFileSync(fileName, {encoding:'utf-8'});
 
-  const filteredApp: AppResult[] = apps(data, filter).content;
-  const filteredContact: ContactsResult[] = contacts(data, filter).content;
-  const filteredCompany: Company[] = companies(data, filter).content;
+//   const filteredApp: AppResult[] = apps(data, filter).content;
+//   const filteredContact: ContactsResult[] = contacts(data, filter).content;
+//   const filteredCompany: Company[] = companies(data, filter).content;
 
-  let app: App | undefined;
-  let contact: Contact | undefined;
-  let company: Company | undefined;
-
-  // If any results are non-ambiguous
-  if (filteredApp && filteredApp.length === 1) {
-      contact = findContact(data, filteredApp[0].email)?.contact;
-      company = findCompany(data, filteredApp[0].company);
-      app = findApp(data, filteredApp[0].email)?.app;
-  }
-  else if (filteredContact && filteredContact.length === 1) {
-      app = findApp(data, filteredContact[0].company)?.app;
-      company = findCompany(data, filteredContact[0].company);
-      contact = findContact(data, filteredContact[0].email)?.contact;
-  }
-  else if (filteredCompany && filteredCompany.length === 1) {
-      app = findApp(data, filteredCompany[0].name)?.app;
-      contact = findContact(data, filteredCompany[0].name)?.contact;
-      company = findCompany(data, filteredCompany[0].name);
-  }
-  // If some results are ambiguous, pick app, or contact, or company
-  else if (filteredApp && filteredApp.length > 1) {
-      contact = findContact(data, filteredApp[0].email)?.contact;
-      company = findCompany(data, filteredApp[0].company);
-      app = findApp(data, filteredApp[0].email)?.app;
-  }
-  else if (filteredContact && filteredContact.length > 1) {
-      app = findApp(data, filteredContact[0].company)?.app;
-      company = findCompany(data, filteredContact[0].company);
-      contact = findContact(data, filteredContact[0].email)?.contact;
-  }
-  else if (filteredCompany && filteredCompany.length > 1) {
-      app = findApp(data, filteredCompany[0].name)?.app;
-      contact = findContact(data, filteredCompany[0].name)?.contact;
-      company = findCompany(data, filteredCompany[0].name);
-  }
-  // Else, no result
-  else {
-      throw 'ERROR: No contact found.';
-  }
+  let { contact, company, app } = await findEntities(database, filter);
 
   if (!contact && company) {
       contact = company.contacts[0];
@@ -114,3 +71,30 @@ export async function template(data: Database, arg: string) {
       printAsText: () => console.log(content)
   };
 }
+async function findEntities(database: DatabaseSession, filter: string) {
+    const app = await database.findAppByName(filter) || await database.findAppByEmail(filter);
+
+    // If any results are non-ambiguous
+    if (app) {
+        const contact = await database.findContactByEmail(app.app.email);
+        return { app: app.app, contact: contact?.contact, company: app.company }
+    }
+
+    const contact = await database.findContactByEmail(filter);
+    if (contact) {
+        const company = contact.company;
+        return { company, app: company?.apps[0], contact: contact.contact };
+    }
+
+    let company = await database.findCompanyByName(filter);
+    if (company) {
+        return {
+            company,
+            contact: company.contacts[0],
+            apps: company.apps[0],
+        }
+    }
+
+    throw 'ERROR: No contact found.';
+}
+

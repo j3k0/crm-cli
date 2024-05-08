@@ -1,10 +1,12 @@
 import enquirer from 'enquirer';
 import { doYouConfirm } from "../utils";
-import { saveData } from "../../database";
+import { DatabaseSession } from "../../database";
 import { findCompany } from "../../queries/requests";
-import { Contact, Database, Printable } from "../../types";
+import { Contact, Printable } from "../../types";
+import Lib from "../../lib";
 
-export async function addContact(data: Database, filter: string | undefined, values: Partial<Contact & { company: string }> = {}): Promise<Contact & Printable> {
+export async function addContact(database: DatabaseSession, filter: string | undefined, values: Partial<Contact & { company: string }> = {}): Promise<Contact & Printable> {
+  const data = await database.dump();
   let contact: Partial<Contact & { company: string } & Printable> = { ...values };
   console.log('');
   console.log('New Contact:');
@@ -39,17 +41,16 @@ export async function addContact(data: Database, filter: string | undefined, val
   await doYouConfirm();
   // If name is filled and there isn't a company with the given name.
   // Add it and save
-  const companyName = values.company;
+  const companyName = contact.company;
   const company = findCompany(data, companyName); // fuzzy search for the company
-  delete contact.company;
   if (company) {
       contact.createdAt = new Date().toISOString();
       contact.updatedAt = new Date().toISOString();
       contact.firstName = contact.firstName || '';
       contact.lastName = contact.lastName || '';
       // Find the company in the data
-      company.contacts.push(contact as Contact);
-      await saveData(data, { company: company.name });
+    //   company.contacts.push(contact as Contact);
+      await Lib.addContact(database, contact);
       console.log('Contact added.');
       // contacts(data, company.name).printAsText();;
       // process.exit(0);

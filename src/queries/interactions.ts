@@ -2,6 +2,7 @@ import Fuse from "fuse.js";
 import { App, Company, Database, PrintableArray } from "../types";
 import { defaultTableOptions, fieldToText, tableToString } from "../cli/table";
 import Table from "cli-table";
+import { DatabaseSession } from "../database";
 
 export interface InteractionsResult {
   id?: number;
@@ -13,7 +14,7 @@ export interface InteractionsResult {
   followup: string;
 }
 
-export function interactions(data: Database, filter?: string, delColumns?: (keyof InteractionsResult)[]): PrintableArray<InteractionsResult> {
+export async function interactions(database: DatabaseSession, filter?: string, delColumns?: (keyof InteractionsResult)[]): Promise<PrintableArray<InteractionsResult>> {
   let out: InteractionsResult[] = [];
   const columns: (keyof InteractionsResult)[] = ['id', 'company', 'kind', 'date', 'from', 'summary', 'followup'];
   const displayColumns = columns.filter((c) => !delColumns || delColumns.indexOf(c) < 0);
@@ -24,6 +25,7 @@ export function interactions(data: Database, filter?: string, delColumns?: (keyo
           id: id++
       });
   }
+  const data = await database.dump();
   data.companies.forEach((company) => {
       company.apps.forEach((app) => {
           out.push({

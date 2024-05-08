@@ -1,13 +1,13 @@
-import { saveData } from "../../database";
+import { DatabaseSession } from "../../database";
 import { findInteraction } from "../../queries/requests";
-import { Database } from "../../types";
 import { doYouConfirm } from "../utils";
 
-export async function doneInteraction(data: Database, filter?: string) {
+export async function doneInteraction(database: DatabaseSession, filter?: string) {
   if (!filter) {
       console.log('Usage: crm done ID');
       process.exit(1);
   }
+  const data = await database.dump();
   let interaction;
   if ('' + parseInt(filter) === filter) {
       const findResult = findInteraction(data, filter);
@@ -17,7 +17,7 @@ export async function doneInteraction(data: Database, filter?: string) {
       interaction.updatedAt = new Date().toISOString();
       interaction.followUpDate = undefined;
       await doYouConfirm(JSON.stringify(interaction, null, 4));
-      await saveData(data, { company: findResult.company.name });
+      await database.updateCompany(findResult.company.name, findResult.company);
       console.log('Interaction updated.');
   }
   return { printAsText: () => {} };

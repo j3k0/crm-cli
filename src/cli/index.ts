@@ -1,4 +1,4 @@
-import { initData, loadData, saveData} from "../database";
+import { connectDatabase } from "../database";
 import { about } from "../queries/about";
 import { apps } from "../queries/apps";
 import { companies } from "../queries/companies";
@@ -23,9 +23,7 @@ module.exports = {
     //     editFile,
     // },
     data: {
-        init: initData,
-        load: loadData,
-        save: saveData,
+        connectDatabase,
     },
     interactions: {
         edit: editInteraction,

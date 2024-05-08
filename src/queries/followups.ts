@@ -3,6 +3,7 @@ import Fuse from 'fuse.js';
 import moment from 'moment';
 import Table from 'cli-table';
 import { defaultTableOptions, fieldToText, tableToString } from "../cli/table";
+import { DatabaseSession } from "../database";
 
 export interface FollowUpsResult {
   id?: number;
@@ -13,11 +14,12 @@ export interface FollowUpsResult {
   date: string;
 }
 
-export function followups(data: Database, filter: string, delColumns: (keyof FollowUpsResult)[]): PrintableArray<FollowUpsResult> {
+export async function followups(database: DatabaseSession, filter: string, delColumns: (keyof FollowUpsResult)[]): Promise<PrintableArray<FollowUpsResult>> {
   let out: FollowUpsResult[] = [];
   const columns: (keyof FollowUpsResult)[] = ['id', 'company', 'date', 'tag', 'summary', 'email'];
   const displayColumns = columns.filter((c) => !delColumns || delColumns.indexOf(c) < 0);
   let id = 1;
+  const data = await database.dump();
   data.companies.forEach((companyData) => {
       const company = new Company(companyData);
       if (company.noFollowUp) return;

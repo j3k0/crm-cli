@@ -2,6 +2,7 @@ import Table from "cli-table";
 import { App, CompanyAttributes, Database, PrintableArray } from "../types";
 import { defaultTableOptions, fieldToText, tableToString } from "../cli/table";
 import Fuse from "fuse.js";
+import { DatabaseSession } from "../database";
 
 export interface AppResult {
     company: CompanyAttributes["name"];
@@ -13,10 +14,11 @@ export interface AppResult {
     plan: App["plan"];
 }
 
-export function apps (data: Database, filter?: string, delColumns?: (keyof AppResult)[]): PrintableArray<AppResult> {
+export async function apps (database: DatabaseSession, filter?: string, delColumns?: (keyof AppResult)[]): Promise<PrintableArray<AppResult>> {
     let out: AppResult[] = [];
     const columns: (keyof AppResult)[] = ['company', 'plan', 'created', 'upgraded', 'churned', 'name', 'email'];
     const displayColumns = columns.filter((c) => !delColumns || delColumns.indexOf(c) < 0);
+    const data = await database.dump();
     data.companies.forEach((company) => {
         company.apps.forEach((app) => {
             out.push({

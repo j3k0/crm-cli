@@ -4,36 +4,38 @@ import { apps } from "../../queries/apps";
 import { companies } from "../../queries/companies";
 import { contacts } from "../../queries/contacts";
 import { interactions } from "../../queries/interactions";
-import { Choice, Database, Interaction, Printable } from "../../types";
+import { Choice, Interaction, Printable } from "../../types";
 import { addCompany } from './addCompany';
 import { addContact } from './addContact';
 import Lib from '../../lib';
 import moment from 'moment';
+import { DatabaseSession } from '../../database';
 
 
-export async function addInteraction(data: Database, filter: string | undefined): Promise<Interaction & Printable> {
+export async function addInteraction(database: DatabaseSession, filter: string | undefined): Promise<Interaction & Printable> {
   console.log('');
   console.log('New Interaction:');
   console.log('----------------');
 
+  const data = await database.dump();
   const sumCount: {[summary: string]: number} = {};
-  const listOfSummaries = Object.keys(interactions(data).content.reduce((acc, x) => {
+  const listOfSummaries = Object.keys((await interactions(database)).content.reduce((acc, x) => {
       acc[x.summary] = (acc[x.summary] || 0) + 1;
       return acc;
   }, sumCount)).sort((a, b) => {
       return sumCount[b] - sumCount[a]; // length - b.length;
   });
 
-  let listOfCompanies = companies(data, filter).content;
+  let listOfCompanies = (await companies(database, filter)).content;
   if (listOfCompanies.length === 0) {
-      const contact = contacts(data, filter).content;
+      const contact = (await contacts(database, filter)).content;
       if (contact.length > 0)
-          listOfCompanies = companies(data, contact[0].company).content;
+          listOfCompanies = (await companies(database, contact[0].company)).content;
   }
   if (listOfCompanies.length === 0) {
-      const app = apps(data, filter).content;
+      const app = (await apps(database, filter)).content;
       if (app.length > 0)
-          listOfCompanies = companies(data, app[0].company).content;
+          listOfCompanies = (await companies(database, app[0].company)).content;
   }
   const newCompany: Choice = {
       message: 'New Company',
@@ -123,14 +125,14 @@ export async function addInteraction(data: Database, filter: string | undefined)
       interaction.summary = newSummary;
 
   if (interaction.company === 'new_company') {
-      const newCompany = await addCompany(data, undefined);
+      const newCompany = await addCompany(database, undefined);
       if ('name' in newCompany) {
         interaction.company = newCompany.name;
       }
   }
 
   if (interaction.from === 'new_contact') {
-      const newContact = await addContact(data, undefined, {company: interaction.company});
+      const newContact = await addContact(database, undefined, {company: interaction.company});
       interaction.from = newContact.email;
   }
 
@@ -139,7 +141,7 @@ export async function addInteraction(data: Database, filter: string | undefined)
   }
 
   // Add it and save
-  const newInteraction = Lib.addInteraction(data, interaction);
+  const newInteraction = await Lib.addInteraction(database, interaction);
   if ('error' in newInteraction) {
       process.exit(1);
   }

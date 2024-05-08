@@ -1,10 +1,10 @@
-import { saveData } from "./database";
+import { DatabaseSession } from "./database";
 import { findApp, findAppByName, findCompany, findCompanyByName, findContact } from "./queries/requests";
 import { App, Company, CompanyAttributes, Config, Contact, Database, Interaction } from "./types";
 
-export async function addCompany(data: Database, company: Partial<CompanyAttributes>): Promise<Company | {}> {
+export async function addCompany(database: DatabaseSession, company: Partial<CompanyAttributes>): Promise<Company | {}> {
 
-  const found = company.name && data.companies.find((c) => c.name.toLowerCase() === company.name!.toLowerCase());
+  const found = company.name ? await database.findCompanyByName(company.name) : undefined;
   if (company.name && !found) {
       company.createdAt = new Date().toISOString();
       company.updatedAt = new Date().toISOString();
@@ -12,8 +12,7 @@ export async function addCompany(data: Database, company: Partial<CompanyAttribu
       company.interactions = [];
       company.apps = [];
       const ret = new Company(company as CompanyAttributes);
-      data.companies.push(ret);
-      await saveData(data, { company: ret.name });
+      await database.addCompany(ret);
       console.log('Company added.');
       return ret;
   }
@@ -28,60 +27,59 @@ export async function addCompany(data: Database, company: Partial<CompanyAttribu
   return {}
 }
 
-export async function editCompany(data: Database, name: string, attributes: Partial<CompanyAttributes>): Promise<Company | {error: string}> {
+export async function editCompany(database: DatabaseSession, name: string, attributes: Partial<CompanyAttributes>): Promise<Company | {error: string}> {
     // If name is filled and there isn't a company with the given name.
     // Add it and save
     if (!name) {
       return {error: 'missing name'};
     }
-    const company = findCompanyByName(data, name);
-    if (!company) {
-      return {error: 'company not found'};
-    }
-    if (attributes.name !== undefined && attributes.name !== name) {
-      return {error: 'incorrect body name'};
-    }
-    Object.assign(company, {
-      ...attributes,
-      updatedAt: new Date().toISOString(),
-    });
-    await saveData(data, { company: name });
+    // const company = await database.findCompanyByName(name);
+    const company = await database.updateCompany(name, attributes);
     console.log('Company updated.');
     return company;
 }
 
-export async function editApp(data: Database, appName: string, attributes: Partial<App>): Promise<App | {error: string}> {
+export async function editApp(database: DatabaseSession, appName: string, attributes: Partial<App>): Promise<App | {error: string}> {
     // If name is filled and there isn't a company with the given name.
     // Add it and save
     if (!appName) {
       return {error: 'missing appName'};
     }
-    const app = findAppByName(data, appName);
-    if (!app || app.app.appName !== appName) {
+    const found = await database.findAppByName(appName);
+    if (!found || found.app.appName !== appName) {
       return {error: 'app not found'};
     }
     if (attributes.appName !== undefined && attributes.appName !== appName) {
       return {error: 'incorrect body appName'};
     }
-    Object.assign(app.app, {
+    Object.assign(found.app, {
       ...attributes,
       updatedAt: new Date().toISOString(),
     });
-    await saveData(data, { company: app.company.name });
+    const result = await database.updateCompany(found.company.name, {
+      apps: [
+        ...found.company.apps.filter(a => a.appName !== appName),
+        found.app,
+      ]
+    });
+    if ('error' in result) {
+      return result;
+    }
     console.log('App updated.');
-    return app.app;
+    return found.app;
 }
 
-export async function addContact(data: Database, attributes: Partial<Contact & { company?: string | undefined; }>): Promise<Contact | {error: string}> {
+export async function addContact(database: DatabaseSession, attributes: Partial<Contact & { company?: string | undefined; }>): Promise<Contact | {error: string}> {
     // If name is filled and there isn't a company with the given name.
     // Add it and save
     if (!attributes.company || !attributes.email) {
       return {error: 'missing company or email'};
     }
+    attributes.email = attributes.email.toLowerCase();
     const companyName = attributes.company;
-    const company = findCompany(data, companyName); // fuzzy search for the company
+    const company = await database.findCompanyByName(companyName);
     delete attributes.company;
-    const existing = findContact(data, attributes.email);
+    const existing = await database.findContactByEmail(attributes.email);
     if (existing?.contact.email === attributes.email) {
       return {error: 'contact already exists in company ' + existing?.company.name};
     }
@@ -89,11 +87,18 @@ export async function addContact(data: Database, attributes: Partial<Contact & {
         attributes.createdAt = (attributes.createdAt ? new Date(attributes.createdAt) : new Date()).toISOString();
         attributes.updatedAt = new Date().toISOString();
         // Find the company in the data
-        const ret = attributes as Contact;
-        company.contacts.push(ret);
-        await saveData(data, { company: company.name });
+        const contact = attributes as Contact;
+        const result = await database.updateCompany(companyName, {
+          contacts: [
+            ...company.contacts,
+            contact
+          ]
+        });
+        if ('error' in result) {
+          return result;
+        }
         console.log('Contact added.');
-        return ret;
+        return contact;
     }
     else {
         console.error(`ERROR: Company with name "${companyName}" doesn't exists.`);
@@ -103,25 +108,28 @@ export async function addContact(data: Database, attributes: Partial<Contact & {
     }
 }
 
-export async function addApp(data: Database, app: Partial<App & { company?: string | undefined; }>): Promise<App | {error: string}> {
+export async function addApp(database: DatabaseSession, app: Partial<App & { company?: string | undefined; }>): Promise<App | {error: string}> {
     // If name is filled and there isn't a company with the given name.
     // Add it and save
     if (!app.company || !app.appName) {
       return {error: 'missing company or appName'};
     }
     const companyName = app.company;
-    const company = findCompany(data, companyName); // fuzzy search for the company
+    const company = await database.findCompanyByName(companyName);
     delete app.company;
     if (company) {
         app.createdAt = (app.createdAt ? new Date(app.createdAt) : new Date()).toISOString();
         app.upgradedAt = app.upgradedAt ? new Date(app.upgradedAt).toISOString() : undefined;
         app.updatedAt = new Date().toISOString();
-        // Find the company in the data
-        const ret = app as App;
-        company.apps.push(ret);
-        await saveData(data, { company: company.name });
+        const newApp = app as App;
+        await database.updateCompany(companyName, {
+          apps: [
+            ...company.apps,
+            newApp,
+          ]
+        });
         console.log('App added.');
-        return ret;
+        return newApp;
     }
     else {
         console.error(`ERROR: Company with name "${companyName}" doesn't exists.`);
@@ -131,7 +139,7 @@ export async function addApp(data: Database, app: Partial<App & { company?: stri
     }
 }
 
-export async function addInteraction(data: Database, interaction: Interaction & { company: string; }): Promise<Interaction | {error: string}> {
+export async function addInteraction(database: DatabaseSession, interaction: Interaction & { company: string; }): Promise<Interaction | {error: string}> {
     if (!interaction.summary) {
       return {error: '"summary" is missing'};
     }
@@ -139,26 +147,22 @@ export async function addInteraction(data: Database, interaction: Interaction & 
       return {error: '"from" is missing'};
     }
     const companyName = interaction.company;
-    const company = findCompany(data, companyName); // fuzzy search for the company
+    const company = await database.findCompanyByName(companyName);
+    if (!company) {
+      return {error: 'company not found'};
+    }
     delete (interaction as any).company;
-    const contact = findContact(data, interaction.from);
-    if (company && contact) {
-        // interaction.createdAt = new Date().toISOString();
-        // Find the company in the data
-        interaction.date = interaction.date || new Date().toISOString();
-        interaction.from = contact.contact.email;
-        company.interactions.push(interaction);
-        await saveData(data, { company: company.name });
-        console.log('Interaction added.');
-    }
-    else if (!company) {
-        console.error(`ERROR: Company with name "${companyName}" doesn't exists.`);
-        return { error: `Company with name "${companyName}" doesn't exists.` };
-    }
-    else if (!contact) {
-        console.error(`ERROR: Contact with email "${interaction.from}" doesn't exists.`);
-        return { error: `Contact with email "${interaction.from}" doesn't exists.` };
-    }
+    // interaction.createdAt = new Date().toISOString();
+    // Find the company in the data
+    interaction.date = interaction.date || new Date().toISOString();
+    const ret = await database.updateCompany(companyName, {
+      interactions: [
+        ...company.interactions,
+        interaction
+      ]
+    });
+    if ('error' in ret) return ret;
+    console.log('Interaction added.');
     return interaction;
 }
 
@@ -167,21 +171,20 @@ interface StaffDefinition {
   email: string;
 }
 
-export async function addStaff(data: Database, staff: Partial<StaffDefinition>): Promise<{ [email: string]: string } | { error: string }> {
+export async function addStaff(database: DatabaseSession, staff: Partial<StaffDefinition>): Promise<{ [email: string]: string } | { error: string }> {
   if (staff.name && staff.email) {
-    data.config.staff[staff.email] = staff.name;
-    await saveData(data, "config");
-    return data.config.staff;
+    const config = await database.loadConfig();
+    config.staff[staff.email] = staff.name;
+    await database.updateConfig({staff: config.staff});
+    return config.staff;
   }
   else {
     return {error: 'incomplete data: name or email missing'};
   }
 }
 
-export async function editConfig(data: Database, attributes: Partial<Config>): Promise<Config | { error: string }> {
-  Object.assign(data.config, attributes);
-  await saveData(data, "config");
-  return data.config;
+export async function editConfig(database: DatabaseSession, attributes: Partial<Config>) {
+    return await database.updateConfig(attributes);
 }
 
 export default {

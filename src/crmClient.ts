@@ -18,6 +18,26 @@ export class CrmClient {
     }
   }
 
+  async findCompany(name: string): Promise<CompanyAttributes[] | undefined> {
+    try {
+      const response = await axios.get(`${this.baseUrl}/companies/find/${encodeURIComponent(name)}`);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching company:', error);
+      throw error;
+    }
+  }
+
+  async updateCompany(name: string, attributes: Partial<CompanyAttributes>): Promise<CompanyAttributes | undefined> {
+    try {
+      const response = await axios.put(`${this.baseUrl}/companies/${encodeURIComponent(name)}`, attributes);
+      return response.data;
+    } catch (error) {
+      console.error('Error updating company:', error);
+      throw error;
+    }
+  }
+
   async allCompanies(): Promise<CompanyAttributes[] | undefined> {
     try {
       const response = await axios.get(`${this.baseUrl}/companies`);
