@@ -1,4 +1,4 @@
-import { CrmClient, crmClient } from "../../crmClient";
+import { CrmApiClient, crmApiClient } from "../../crmApiClient";
 import { App, Company, CompanyAttributes, Config, Contact, Database } from "../../types";
 import { DatabaseSessionCache } from "./sessionCache";
 import { DatabaseAdapter, DatabaseSession } from "../types";
@@ -8,10 +8,10 @@ import { DatabaseAdapter, DatabaseSession } from "../types";
  */
 export class RemoteApiAdapter implements DatabaseAdapter {
 
-  client: CrmClient;
+  client: CrmApiClient;
 
   constructor(url: string) {
-    this.client = crmClient(url);
+    this.client = crmApiClient(url);
   }
 
   async create(initialData: Database): Promise<void> {
@@ -25,9 +25,9 @@ export class RemoteApiAdapter implements DatabaseAdapter {
 
 export class RemoteApiSession implements DatabaseSession {
 
-  client: CrmClient;
+  client: CrmApiClient;
 
-  constructor(client: CrmClient) {
+  constructor(client: CrmApiClient) {
     this.client = client;
   }
 

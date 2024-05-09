@@ -58,7 +58,35 @@ function parseOptions(options?: DatabaseConnectOptions): DatabaseConnectParsedOp
     }
 }
 
-export async function connectDatabase(options?: DatabaseConnectOptions): Promise<DatabaseAdapter> {
+/**
+ * Connects to a database based on the provided options or environment variables.
+ * 
+ * This function supports connecting to different types of databases, including:
+ * - In-memory database
+ * - Filesystem-based database
+ * - Remote API database
+ * - CouchDB database
+ * 
+ * The connection type is determined by the `options` parameter or the `DATABASE_URL` environment variable.
+ * If no options are provided and `DATABASE_URL` is not set, it defaults to a filesystem database.
+ * 
+ * @param {DatabaseConnectOptions} [options] - The options for connecting to the database.
+ * @returns {Promise<DatabaseAdapter>} A promise that resolves to a `DatabaseAdapter` instance.
+ * @throws {Error} If the provided database URL is invalid or unsupported.
+ * 
+ * @example
+ * // Connect to a filesystem database
+ * const db = await connectCrmDatabase({ type: "filesystem", path: "/path/to/db.json" });
+ * 
+ * @example
+ * // Connect to a remote API
+ * const db = await connectCrmDatabase({ type: "remote", url: "https://user:APIKEY@crm.example.com" });
+ * 
+ * @example
+ * // Connect to a CouchDB database
+ * const db = await connectCrmDatabase({ type: "couchdb", url: "couchdb://localhost:5984/mydb" });
+ */
+export async function connectCrmDatabase(options?: DatabaseConnectOptions): Promise<DatabaseAdapter> {
     options = parseOptions(options);
     switch (options.type) {
         case "memory":
@@ -75,5 +103,5 @@ export async function connectDatabase(options?: DatabaseConnectOptions): Promise
 export { DatabaseAdapter, DatabaseSession } from './types';
 
 export default {
-    connectDatabase,
+    connectCrmDatabase,
 }

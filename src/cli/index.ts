@@ -1,4 +1,4 @@
-import { connectDatabase } from "../database";
+import { connectCrmDatabase } from "../database";
 import { about } from "../queries/about";
 import { apps } from "../queries/apps";
 import { companies } from "../queries/companies";
@@ -24,7 +24,7 @@ module.exports = {
     //     editFile,
     // },
     data: {
-        connectDatabase,
+        connectCrmDatabase: connectCrmDatabase,
     },
     interactions: {
         edit: editInteraction,

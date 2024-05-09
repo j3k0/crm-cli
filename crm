@@ -105,7 +105,7 @@ Object.keys(commands).forEach((key) => {
 
 async function main() {
 
-    const database = await crmCli.data.connectDatabase();
+    const database = await crmCli.data.connectCrmDatabase();
     if (process.argv[2] === 'init-crm') {
         await database.create();
         console.log('Done.');

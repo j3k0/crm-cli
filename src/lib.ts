@@ -1,16 +1,16 @@
-import { DatabaseSession } from "./database";
+import { DatabaseAdapter, DatabaseSession, connectCrmDatabase } from "./database";
 import { App, Company, CompanyAttributes, Config, Contact, Interaction } from "./types";
 
-export async function addCompany(database: DatabaseSession, company: Partial<CompanyAttributes>): Promise<Company | {}> {
+export async function addCompany(database: DatabaseSession, company: Partial<CompanyAttributes>): Promise<Company | {error: string}> {
 
   if (!company.name) {
     console.error({ company }, `ERROR: incomplete data, name missing.`);
-    return {};
+    return {error: 'name is missing'};
   }
   const found = await database.findCompanyByName(company.name);
   if (found) {
       console.error(`ERROR: A company with name "${company.name}" already exists.`);
-      return found;
+      return {error: 'a company with this already exists'};
   }
   company.createdAt = new Date().toISOString();
   company.updatedAt = new Date().toISOString();
@@ -195,7 +195,34 @@ export async function addInteraction(database: DatabaseSession, interaction: Int
     return interaction;
 }
 
-interface StaffDefinition {
+export async function editInteraction(database: DatabaseSession, companyName: string, index: number, attributes: Partial<Interaction>): Promise<Interaction | {error: string}> {
+  // If name is filled and there isn't a company with the given name.
+  // Add it and save
+  if (!companyName || !isFinite(index)) {
+    return {error: 'missing interaction company or id'};
+  }
+  const company = await database.findCompanyByName(companyName);
+  if (!company) {
+    return {error: 'company not found'};
+  }
+  if (index < 0 || index >= company.interactions.length) {
+    return {error: 'interaction index out of range'};
+  }
+  const interaction = company.interactions[index];
+  Object.assign(interaction, {
+    ...attributes,
+    updatedAt: new Date().toISOString(),
+  });
+  const result = await database.updateCompany(companyName, {
+    interactions: company.interactions
+  });
+  if ('error' in result) {
+    return result;
+  }
+  return interaction;
+}
+
+export interface StaffDefinition {
   name: string;
   email: string;
 }
@@ -217,13 +244,16 @@ export async function editConfig(database: DatabaseSession, attributes: Partial<
 }
 
 export default {
+
   addCompany,
   addApp,
   addContact,
   addInteraction,
   addStaff,
+
   editApp,
   editConfig,
   editCompany,
   editContact,
+  editInteraction,
 }

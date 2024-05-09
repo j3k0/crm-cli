@@ -1,21 +1,21 @@
 import express from 'express';
 import crypto from 'crypto';
 import bunyan from 'bunyan';
-import Lib from './lib';
-import { connectDatabase } from './database';
+import { connectCrmDatabase } from './database';
 import { emptyDatabase } from './database/emptyDatabase';
 import { randomUUID } from 'crypto';
+import { CrmSession } from './crmSession';
 
 const log = bunyan.createLogger({
   name: 'crm-server',
 });
 
-export async function createServer() {
+export async function startCrmApiServer() {
   const app = express();
   const hostname = process.env.HOSTNAME || 'localhost';
   const port = parseInt(process.env.PORT || '3954');
   const apiKey = process.env.SERVER_API_KEY || randomUUID().replace(/-/g, '');
-  const database = await connectDatabase();
+  const database = await connectCrmDatabase();
 
   app.use(express.json({ limit: '1024mb' }));
 
@@ -168,11 +168,11 @@ export async function createServer() {
      * @returns {void}
      */
     async function openDatabaseSession(req, res, next) {
-      req.session = await database.open();
+      req.session = new CrmSession(database);
       // Close database session
       res.on('finish', async function closeDatabaseSessionOnFinish() {
         if (req.session) {
-          req.session.close();
+          await req.session.close();
         }
       });
       next();
@@ -278,11 +278,11 @@ export async function createServer() {
     * @apiExample {curl} Example usage:
     *     curl -X POST -H "Content-Type: application/json" -d @requestBody.json http://localhost:3954/companies
     */ 
-  async function postCompanies(req, res) {
+  async function postCompanies(req, res, next) {
     const newCompany = req.body; // Assuming the request body contains the new app data
     if ('name' in newCompany) {
-      const company = await Lib.addCompany(req.session, newCompany);
-      res.json(company);
+      const company = await req.session.addCompany(newCompany);
+      respondWithLibResult(req, res, next, company, c => c);
     }
     else {
       res.status(400).json({
@@ -353,7 +353,7 @@ export async function createServer() {
     async function putCompanies(req, res, next) {
       const name = req.params.name;
       const newCompany = req.body; // Assuming the request body contains the new app data
-      const company = await Lib.editCompany(req.session, name, newCompany);
+      const company = await req.session.updateCompany(name, newCompany);
       respondWithLibResult(req, res, next, company, company => ({ company }));
     });
 
@@ -408,7 +408,7 @@ export async function createServer() {
       const company: string | undefined = newInteraction.company;
       if (!company || typeof company !== 'string')
         return res.status(400).json({ error: '"company" missing' });
-      const result = await Lib.addInteraction(req.session, newInteraction);
+      const result = await req.session.addInteraction(newInteraction);
       respondWithLibResult(req, res, next, result, interaction => ({ interaction }));
     });
 
@@ -439,7 +439,7 @@ export async function createServer() {
       const company = newContact.company;
       if (!company)
         return res.status(400).json({ error: '"company" missing' });
-      const added = await Lib.addContact(req.session, newContact);
+      const added = await req.session.addContact(newContact);
       respondWithLibResult(req, res, next, added, contact => ({ contact }));
     });
 
@@ -447,7 +447,7 @@ export async function createServer() {
   app.put('/contacts/:email',
     async function putContact(req, res, next) {
       const email = req.params.email;
-      const result = await Lib.editContact(req.session, email, req.body);
+      const result = await req.session.updateContact(email, req.body);
       respondWithLibResult(req, res, next, result, contact => ({contact}));
     });
 
@@ -552,14 +552,14 @@ export async function createServer() {
       if (!company) {
         return res.status(400).json({ error: '"company" missing' });
       }
-      const result = await Lib.addApp(req.session, newApp);
+      const result = await req.session.addApp(newApp);
       respondWithLibResult(req, res, next, result, app => ({ app }));
     });
 
   // PUT to update an app
   app.put('/apps/:appName', async function putApps(req, res) {
     const attributes = req.body;
-    const added = await Lib.editApp(req.session, req.params.appName, attributes);
+    const added = await req.session.updateApp(req.params.appName, attributes);
     if ('error' in added) {
       res.status(400).json({
         message: 'Failed to update app: ' + added.error
@@ -575,26 +575,23 @@ export async function createServer() {
 
   app.put('/config', async function putConfig(req, res) {
     const attributes = req.body;
-    const config = await Lib.editConfig(req.session, attributes);
+    const config = await req.session.updateConfig(attributes);
     res.json(config);
   });
 
   app.get('/config', async function getConfig(req, res) {
-    const session = await database.open();
-    const config = await session.loadConfig();
-    res.json(config);
-    session.close();
+    res.json(await req.session.loadConfig());
   });
 
   app.get('/config/staff', async function getConfigStaff(req, res) {
-    const staff = (await (await database.open()).loadConfig()).staff;
+    const staff = (await req.session.loadConfig()).staff;
     res.json(staff);
   });
 
   app.post('/config/staff',
     async function postConfigStaff(req, res, next) {
       const newStaff = req.body; // format: { "name": "User Full Name", "email": "email@domain.com" }
-      const added = await Lib.addStaff(req.session, newStaff);
+      const added = await req.session.addStaff(newStaff);
       respondWithLibResult(req, res, next, added, staff => ({staff}));
     });
 
@@ -645,5 +642,5 @@ export async function createServer() {
 
 // if this script is the entrypoint, call createServer
 if (require.main === module) {
-  createServer();
+  startCrmApiServer();
 }

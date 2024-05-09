@@ -1,9 +1,10 @@
 import axios from 'axios';
 import { App, Company, CompanyAttributes, Config, Contact, Database } from './types';
 
-export * from "./types";
-
-export class CrmClient {
+/**
+ * Client for the CrmApiServer
+ */
+export class CrmApiClient {
   baseUrl: string;
 
   constructor(baseUrl: string) {
@@ -163,10 +164,10 @@ export class CrmClient {
   }
 }
 
-const clientsPool: { [url: string]: CrmClient } = {};
+const clientsPool: { [url: string]: CrmApiClient } = {};
 
-export function crmClient(url?: string) {
+export function crmApiClient(url?: string) {
   const defaultPort = parseInt(process.env.PORT || '3954');
   url = url || `http://localhost:${defaultPort}`;
-  return clientsPool[url] ?? (clientsPool[url] = new CrmClient(url));
+  return clientsPool[url] ?? (clientsPool[url] = new CrmApiClient(url));
 }

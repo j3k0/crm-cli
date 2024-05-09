@@ -1,6 +1,6 @@
 import { DatabaseSession } from '../../database/types';
-import { createServer } from '../../server';
+import { startCrmApiServer } from '../../crmApiServer';
 export async function serverRun(database: DatabaseSession, arg: string) {
-  await createServer();
+  await startCrmApiServer();
   return { printAsText: async () => {} };
 }
