@@ -162,8 +162,7 @@ export class CouchDBSession implements DatabaseSession {
   async findCompanyByName(name: string): Promise<Company | undefined> {
     try {
       const query = new URLSearchParams({
-        startkey: JSON.stringify(name),
-        endkey: JSON.stringify(name + '$'),
+        key: JSON.stringify(name),
         limit: '1',
         include_docs: 'true'
       }).toString();

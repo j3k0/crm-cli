@@ -80,26 +80,46 @@ export class CrmClient {
     }
   }
 
-  // async addContact(contactData: Contact & { company: string }): Promise<Contact> {
-  //   try {
-  //     const response = await axios.post(`${this.baseUrl}/contacts`, contactData);
-  //     return response.data;
-  //   } catch (error) {
-  //     console.error('Error adding contact:', error);
-  //     throw error;
-  //   }
-  // }
+  async updateContact(email: string, contactData: Contact & { company: string }): Promise<Contact> {
+    try {
+      const response = await axios.put(`${this.baseUrl}/contacts/${encodeURIComponent(email)}`, contactData);
+      return response.data;
+    } catch (error) {
+      console.error('Error updating contact:', error);
+      throw error;
+    }
+  }
 
-  // async addApp(appData: App & { company: string }): Promise<any> {
-  //   try {
-  //     const response = await axios.post(`${this.baseUrl}/apps`, appData);
-  //     return response.data;
-  //   } catch (error) {
-  //     console.error('Error adding app:', error);
-  //     throw error;
-  //   }
-  // }
-  
+  async addContact(contactData: Contact & { company: string }): Promise<Contact> {
+    try {
+      const response = await axios.post(`${this.baseUrl}/contacts`, contactData);
+      return response.data;
+    } catch (error) {
+      console.error('Error adding contact:', error);
+      throw error;
+    }
+  }
+
+  async addApp(appData: App & { company: string }): Promise<any> {
+    try {
+      const response = await axios.post(`${this.baseUrl}/apps`, appData);
+      return response.data;
+    } catch (error) {
+      console.error('Error adding app:', error);
+      throw error;
+    }
+  }
+
+  async updateApp(appName: string, attributes: Partial<App>): Promise<App | undefined> {
+    try {
+      const response = await axios.put(`${this.baseUrl}/apps/${encodeURIComponent(appName)}`, attributes);
+      return response.data;
+    } catch (error) {
+      console.error('Error updating app:', error);
+      throw error;
+    }
+  }
+
   async findContactByEmail(email: string): Promise<Contact & { company: string } | undefined> {
     return (await axios.get(`${this.baseUrl}/contacts/by-email/${encodeURIComponent(email)}`)).data;
   }
@@ -110,16 +130,6 @@ export class CrmClient {
   
   async findAppByEmail(appName: string): Promise<App & { company: string } | undefined> {
     return (await axios.get(`${this.baseUrl}/apps/by-email/${encodeURIComponent(appName)}`)).data;
-  }
-  
-  async updateApp(appName: string, attributes: Partial<App>): Promise<App | undefined> {
-    try {
-      const response = await axios.put(`${this.baseUrl}/apps/${encodeURIComponent(appName)}`, attributes);
-      return response.data;
-    } catch (error) {
-      console.error('Error updating app:', error);
-      throw error;
-    }
   }
   
   // async searchApps(filter: string): Promise<(App & { company: string }[] | undefined> {
