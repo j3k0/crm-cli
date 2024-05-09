@@ -429,7 +429,13 @@ export async function startCrmApiServer() {
   // GET endpoint to retrieve a contact by email
   app.get('/contacts/by-email/:email',
     async function getFindContactByEmail(req, res) {
-      res.json(await req.session.findContactByEmail(req.params.email));
+      const result = await req.session.findContactByEmail(req.params.email);
+      if (!result)
+        return res.status(404).json({ error: 'contact not found' });
+      res.json({
+        ...result.contact,
+        company: result.company.name
+      });
     });
 
   // POST endpoint to create a new contact
