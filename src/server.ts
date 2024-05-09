@@ -1,8 +1,14 @@
 import express from 'express';
+import crypto from 'crypto';
+import bunyan from 'bunyan';
 import Lib from './lib';
 import { connectDatabase } from './database';
 import { emptyDatabase } from './database/emptyDatabase';
 import { randomUUID } from 'crypto';
+
+const log = bunyan.createLogger({
+  name: 'crm-server',
+});
 
 export async function createServer() {
   const app = express();
@@ -13,6 +19,41 @@ export async function createServer() {
 
   app.use(express.json({ limit: '1024mb' }));
 
+  app.use(
+    /**
+     * Sets up a logger for each request using the Bunyan logging library.
+     * It assigns a unique request ID to each request, either from the 'x-request-id' header
+     * or by generating a new UUID. The logger is then attached to the request object
+     * for use in subsequent middleware or route handlers. Additionally, it logs the
+     * request method and path at the INFO level and sets the 'x-request-id' header
+     * in the response to match the request's ID.
+     */
+    function setupLogger(req, res, next) {
+      let reqId = req.headers['x-request-id'] || crypto.randomUUID().toLowerCase();
+      if (Array.isArray(reqId)) reqId = reqId[0];
+      req.reqId = reqId;
+      req.log = log.child({
+        req_id: reqId,
+      });
+      req.log.info(req.method + ' ' + req.path);
+      res.setHeader('x-request-id', reqId);
+      next();
+    });
+
+  /**
+   * Middleware function to authenticate incoming requests.
+   * 
+   * It checks if the request's Authorization header matches the server's API key
+   * or if the username/password matches the API key.
+   * 
+   * If authentication is successful, it calls the next middleware in the stack.
+   * Otherwise, it responds with a 401 Unauthorized status.
+   *
+   * @param {express.Request} req - The Express request object.
+   * @param {express.Response} res - The Express response object.
+   * @param {express.NextFunction} next - The next middleware function in the stack.
+   * @returns {void}
+   */
   app.use(async function authenticateRequest(req, res, next) {
     const authHeader = req.headers.authorization;
 
@@ -40,89 +81,102 @@ export async function createServer() {
       .json({ error: 'Unauthorized' });
   });
 
-  /**
-   * Resets the database with the provided data, merging it with the default empty database structure.
-   * 
-   * This is useful for initializing the database with a clean state.
-   *
-   * @api {post} /reset Reset the database
-   * @apiName ResetDatabase
-   * @apiGroup Database
-   *
-   * @apiParam {Object} requestBody Initial database structure.
-   * @apiParamExample {json} Request-Example:
-   * {
-   *   "companies": [
-   *     {
-   *       "name": "Example Company",
-   *       "url": "https://example.com",
-   *       "contacts": [
-   *         {
-   *           "email": "contact@example.com",
-   *           "role": "CEO"
-   *         }
-   *       ],
-   *       "apps": [
-   *         {
-   *           "appName": "Example App",
-   *           "plan": "Premium",
-   *           "email": "app@example.com"
-   *         }
-   *       ]
-   *     }
-   *   ],
-   *   "config": {
-   *     "subscriptionPlans": ["Free", "Premium"],
-   *     "staff": {
-   *       "john@example.com": "John Doe"
-   *     },
-   *     "interactions": {
-   *       "kinds": ["email", "phone"],
-   *       "tags": ["urgent", "follow-up"]
-   *     }
-   *   }
-   * }
-   *
-   * @apiSuccess {Object} config The configuration of the database after resetting.
-   * @apiSuccessExample {json} Success-Response:
-   * {
-   *   "subscriptionPlans": ["Free", "Premium"],
-   *   "staff": {
-   *     "john@example.com": "John Doe"
-   *   },
-   *   "interactions": {
-   *     "kinds": ["email", "phone"],
-   *     "tags": ["urgent", "follow-up"]
-   *   }
-   * }
-   *
-   * @apiError (500) {String} message An error message indicating the failure to reset the database.
-   *
-   * @apiExample {curl} Example usage:
-   *     curl -X POST -H "Content-Type: application/json" -d @requestBody.json http://localhost:3954/reset
-   */
-  app.post('/reset', async function postReset(req, res) {
-    const data = {
-      ...emptyDatabase(),
-      ...req.body
-    };
-    await database.create(data);
-    const session = await database.open();
-    res.json(await session.loadConfig());
-  });
+  app.post('/reset',
+    /**
+     * Resets the database with the provided data.
+     * 
+     * If some required fields aren't specified, they are set from the default empty database structure.
+     * 
+     * This is useful for initializing the database with a clean state.
+     *
+     * @api {post} /reset Reset the database
+     * @apiName ResetDatabase
+     * @apiGroup Database
+     *
+     * @apiParam {Object} requestBody Initial database structure.
+     * @apiParamExample {json} Request-Example:
+     * {
+     *   "companies": [
+     *     {
+     *       "name": "Example Company",
+     *       "url": "https://example.com",
+     *       "contacts": [
+     *         {
+     *           "email": "contact@example.com",
+     *           "role": "CEO"
+     *         }
+     *       ],
+     *       "apps": [
+     *         {
+     *           "appName": "Example App",
+     *           "plan": "Premium",
+     *           "email": "app@example.com"
+     *         }
+     *       ]
+     *     }
+     *   ],
+     *   "config": {
+     *     "subscriptionPlans": ["Free", "Premium"],
+     *     "staff": {
+     *       "john@example.com": "John Doe"
+     *     },
+     *     "interactions": {
+     *       "kinds": ["email", "phone"],
+     *       "tags": ["urgent", "follow-up"]
+     *     }
+     *   }
+     * }
+     *
+     * @apiSuccess {Object} config The configuration of the database after resetting.
+     * @apiSuccessExample {json} Success-Response:
+     * {
+     *   "subscriptionPlans": ["Free", "Premium"],
+     *   "staff": {
+     *     "john@example.com": "John Doe"
+     *   },
+     *   "interactions": {
+     *     "kinds": ["email", "phone"],
+     *     "tags": ["urgent", "follow-up"]
+     *   }
+     * }
+     *
+     * @apiError (500) {String} error An error message indicating the failure to reset the database.
+     *
+     * @apiExample {curl} Example usage:
+     *     curl -X POST -H "Content-Type: application/json" -d @requestBody.json http://localhost:3954/reset
+     */
+    async function postReset(req, res) {
+      const data = {
+        ...emptyDatabase(),
+        ...req.body
+      };
+      await database.create(data);
+      const session = await database.open();
+      res.json(await session.loadConfig());
+    });
 
-  // Open a database session when request starts
-  // Close it when it ends
-  app.use(async function openDatabaseSession(req, res, next) {
-    req.session = await database.open();
+  app.use(
+    /**
+     * Middleware function to open a database session for each request.
+     * 
+     * This middleware opens a database session and attaches it to the request object.
+     * It also sets up an event listener to close the database session once the response is finished.
+     * 
+     * @param {express.Request} req - The Express request object.
+     * @param {express.Response} res - The Express response object.
+     * @param {express.NextFunction} next - The next middleware function in the stack.
+     * @returns {void}
+     */
+    async function openDatabaseSession(req, res, next) {
+      req.session = await database.open();
       // Close database session
       res.on('finish', async function closeDatabaseSessionOnFinish() {
         if (req.session) {
           req.session.close();
         }
       });
-    next();
-  });
+      next();
+    });
 
   // app.get('/companies/search/:filter', async function getSearchCompanies(req, res) {
   //   res.json({
@@ -131,21 +185,100 @@ export async function createServer() {
   // });
 
   app.get('/dump', async function getDump(req, res) {
-    console.log(`GET /dump`);
     res.json(await req.session.dump());
   });
+
+  /**
+   * Responds with the result of a CRM library operation, handling both success and error cases.
+   * 
+   * This function checks if the provided value contains an error. If so, it passes the error to the next middleware.
+   * Otherwise, it formats the value using the provided format function and sends it as a JSON response.
+   * 
+   * @template T - The type of the successful result.
+   * @template U - The type of the formatted result sent back to the client.
+   * @param {express.Request} req - The Express request object.
+   * @param {express.Response} res - The Express response object.
+   * @param {express.NextFunction} next - The next middleware function in the stack.
+   * @param {T | { error: string }} value - The result of the library operation, which can be either a successful result or an error object.
+   * @param {(t: T) => U} format - A function that formats the successful result before sending it as a response.
+   */
+  function respondWithLibResult<T extends object, U>(req: express.Request, res: express.Response, next: express.NextFunction, value: T | { error: string }, format: (t: T) => U) {
+    if ('error' in value) {
+      next(value.error);
+    }
+    else {
+      res.json(format(value));
+    }
+  }
 
   app.get('/companies', async function getAllCompanies(req, res) {
     res.json((await req.session.dump()).companies);
   });
 
   app.get('/companies/:name', async function getFindCompanies(req, res) {
-    console.log(`GET /companies/${req.params.name}`);
     const company = await req.session.findCompanyByName(req.params.name);
     res.json(company);
   });
 
-  app.post('/companies', async function postCompanies(req, res) {
+  app.post('/companies',
+    /**
+    * Handles the creation of a new company.
+    * 
+    * This endpoint expects a JSON object in the request body with the company's details.
+    * If the company is successfully created, it returns the created company object.
+    * If the company name already exists or if the request body is missing the 'name' field,
+    * it returns a 400 status code with an error message.
+    *
+    * @api {post} /companies Create a new company
+    * @apiName PostCompanies
+    * @apiGroup Companies
+    *
+    * @apiParam {Object} requestBody The company object to be created.
+    * @apiParamExample {json} Request-Example:
+    * {
+    *   "name": "Example Company",
+    *   "url": "https://example.com",
+    *   "contacts": [
+    *     {
+    *       "email": "contact@example.com",
+    *       "role": "CEO"
+    *     }
+    *   ],
+    *   "apps": [
+    *     {
+    *       "appName": "Example App",
+    *       "plan": "Premium",
+    *       "email": "app@example.com"
+    *     }
+    *   ]
+    * }
+    *
+    * @apiSuccess {Object} company The created company object.
+    * @apiSuccessExample {json} Success-Response:
+    * {
+    *   "name": "Example Company",
+    *   "url": "https://example.com",
+    *   "contacts": [
+    *     {
+    *       "email": "contact@example.com",
+    *       "role": "CEO"
+    *     }
+    *   ],
+    *   "apps": [
+    *     {
+    *       "appName": "Example App",
+    *       "plan": "Premium",
+    *       "email": "app@example.com"
+    *     }
+    *   ]
+    * }
+    *
+    * @apiError (400) {String} error The error message indicating the failure to create the company.
+    *
+    * @apiExample {curl} Example usage:
+    *     curl -X POST -H "Content-Type: application/json" -d @requestBody.json http://localhost:3954/companies
+    */ 
+  async function postCompanies(req, res) {
     const newCompany = req.body; // Assuming the request body contains the new app data
     if ('name' in newCompany) {
       const company = await Lib.addCompany(req.session, newCompany);
@@ -158,22 +291,71 @@ export async function createServer() {
     }
   });
 
-  app.put('/companies/:name', async function putCompanies(req, res) {
-    console.log(`PUT /companies/${req.params.name}`);
-    const newCompany = req.body; // Assuming the request body contains the new app data
-    console.log(JSON.stringify(newCompany, null, 4));
-    const name = req.params.name;
-    if (name && !newCompany.name || (name === newCompany.name)) {
+  app.put('/companies/:name',
+    /**
+     * Updates an existing company with new attributes.
+     * 
+     * This endpoint updates a company's attributes based on the provided request body.
+     * It requires the company's name to be specified in the URL parameters and optionally
+     * allows the new name to be provided in the request body. If the new name is provided,
+     * it must match the name specified in the URL parameters.
+     * 
+     * @api {put} /companies/:name Update a company
+     * @apiName PutCompanies
+     * @apiGroup Companies
+     * 
+     * @apiParam {String} name The current name of the company.
+     * @apiParam {Object} requestBody The new attributes for the company.
+     * @apiParamExample {json} Request-Example:
+     * {
+     *   "name": "New Company Name",
+     *   "url": "https://newcompany.com",
+     *   "contacts": [
+     *     {
+     *       "email": "newcontact@example.com",
+     *       "role": "CTO"
+     *     }
+     *   ],
+     *   "apps": [
+     *     {
+     *       "appName": "New App",
+     *       "plan": "Premium",
+     *       "email": "newapp@example.com"
+     *     }
+     *   ]
+     * }
+     * 
+     * @apiSuccess {Object} company The updated company object.
+     * @apiSuccessExample {json} Success-Response:
+     * {
+     *   "name": "New Company Name",
+     *   "url": "https://newcompany.com",
+     *   "contacts": [
+     *     {
+     *       "email": "newcontact@example.com",
+     *       "role": "CTO"
+     *     }
+     *   ],
+     *   "apps": [
+     *     {
+     *       "appName": "New App",
+     *       "plan": "Premium",
+     *       "email": "newapp@example.com"
+     *     }
+     *   ]
+     * }
+     * 
+     * @apiError (400) {String} error The error message indicating the failure to update the company.
+     * 
+     * @apiExample {curl} Example usage:
+     *     curl -X PUT -H "Content-Type: application/json" -d @requestBody.json http://localhost:3954/companies/OldCompanyName
+     */ 
+    async function putCompanies(req, res, next) {
+      const name = req.params.name;
+      const newCompany = req.body; // Assuming the request body contains the new app data
       const company = await Lib.editCompany(req.session, name, newCompany);
-      res.json({
-        message: 'error' in company ? company.error : 'Company updated',
-        company,
-      });
-    }
-    else {
-      res.status(400).json({ message: 'Failed to update company' });
-    }
-  });
+      respondWithLibResult(req, res, next, company, company => ({ company }));
+    });
 
   // GET endpoint to retrieve all interactions
   // app.get('/interactions', async function getInteractions(req, res) {
@@ -190,26 +372,45 @@ export async function createServer() {
   // });
 
   // POST to add an interaction
-  app.post('/interactions', async function postInteractions(req, res) {
-    const newInteraction = req.body;
-    const company: string | undefined = newInteraction.company;
-    if (!company || typeof company !== 'string') {
-      res.status(400).json({ message: '"company" missing' });
-      return;
-    }
-    const added = await Lib.addInteraction(req.session, newInteraction);
-    if ('error' in added) {
-      res.status(400).json({
-        message: 'Failed to add interaction: ' + added.error
-      });
-    }
-    else {
-      res.json({
-        message: 'Interaction added successfully',
-        interaction: added,
-      });
-    }
-  });
+  app.post('/interactions',
+    /**
+     * Handles the creation of a new interaction.
+     * 
+     * This endpoint expects a JSON object in the request body with the interaction's details, including the company name.
+     * If the interaction is successfully created, it returns the created interaction object.
+     * If the company name is missing or if the interaction details are incomplete, it returns a 400 status code with an error message.
+     *
+     * @api {post} /interactions Create a new interaction
+     * @apiName PostInteractions
+     * @apiGroup Interactions
+     *
+     * @apiParam {Object} requestBody The interaction object to be created.
+     * @apiParamExample {json} Request-Example:
+     * {
+     *   "company": "Example Company",
+     *   "summary": "Meeting with the team",
+     *   "from": "John Doe",
+     *   "date": "2023-04-01T00:00:00.000Z"
+     * }
+     *
+     * @apiSuccess {Object} interaction The created interaction object.
+     * @apiSuccessExample {json} Success-Response:
+     * {
+     *   "company": "Example Company",
+     *   "summary": "Meeting with the team",
+     *   "from": "John Doe",
+     *   "date": "2023-04-01T00:00:00.000Z",
+     *   "createdAt": "2023-04-01T00:00:00.000Z"
+     * }
+     */
+    async function postInteractions(req, res, next) {
+      const newInteraction = req.body;
+      const company: string | undefined = newInteraction.company;
+      if (!company || typeof company !== 'string')
+        return res.status(400).json({ error: '"company" missing' });
+      const result = await Lib.addInteraction(req.session, newInteraction);
+      respondWithLibResult(req, res, next, result, interaction => ({ interaction }));
+    });
 
   // GET endpoint to retrieve all contacts
   // app.get('/contacts', async function getContacts(req, res) {
@@ -226,43 +427,29 @@ export async function createServer() {
   // });
 
   // GET endpoint to retrieve a contact by email
-  app.get('/contacts/by-email/:email', async function getFindContacts(req, res) {
-    console.log('GET /contacts/by-email/' + req.params.email);
-    res.json(await req.session.findContactByEmail(req.params.email));
-  });
+  app.get('/contacts/by-email/:email',
+    async function getFindContactByEmail(req, res) {
+      res.json(await req.session.findContactByEmail(req.params.email));
+    });
 
   // POST endpoint to create a new contact
-  app.post('/contacts', async function postContacts(req, res) {
-    console.log('POST /contacts');
-    const newContact = req.body; // Assuming the request body contains the new contact data
-    const company = newContact.company;
-    if (!company) {
-      res.status(400).json({ message: '"company" missing' });
-      return;
-    }
-    const added = await Lib.addContact(req.session, newContact);
-    if ('error' in added) {
-      res.status(400).json({
-        message: 'Failed to add contact: ' + added.error
-      });
-      return;
-    }
-    res.json({
-      message: 'Contact added successfully',
-      contact: added,
+  app.post('/contacts',
+    async function postContacts(req, res, next) {
+      const newContact = req.body; // Assuming the request body contains the new contact data
+      const company = newContact.company;
+      if (!company)
+        return res.status(400).json({ error: '"company" missing' });
+      const added = await Lib.addContact(req.session, newContact);
+      respondWithLibResult(req, res, next, added, contact => ({ contact }));
     });
-  });
 
   // PUT endpoint to update an existing contact
-  // app.put('/contacts/:email', (req, res) => {
-  //   const contactEmail = req.params.email;
-  //   const updatedContact = req.body; // Assuming the request body contains the updated contact data
-  //   // Implement logic to update an existing contact
-  //   res.json({
-  //     message: 'Contact updated successfully',
-  //     contact: {}, // Replace with actual contact data
-  //   });
-  // });
+  app.put('/contacts/:email',
+    async function putContact(req, res, next) {
+      const email = req.params.email;
+      const result = await Lib.editContact(req.session, email, req.body);
+      respondWithLibResult(req, res, next, result, contact => ({contact}));
+    });
 
   // DELETE endpoint to delete a contact
   // app.delete('/contacts/:id', (req, res) => {
@@ -289,10 +476,9 @@ export async function createServer() {
 
   // GET endpoint to retrieve an app
   app.get('/apps/by-name/:appName', async function getFindApps(req, res) {
-    console.log('GET /apps/by-name/' + req.params.appName);
     const appName = req.params.appName;
     if (!appName) {
-      res.status(400).json({ message: '"appName" is missing' });
+      res.status(400).json({ error: '"appName" is missing' });
       return;
     }
     const result = await req.session.findAppByName(appName);
@@ -306,10 +492,9 @@ export async function createServer() {
   });
 
   app.get('/apps/by-email/:email', async function getFindAppsByEmail(req, res) {
-    console.log('GET /apps/by-email/' + req.params.email);
     const email = req.params.email;
     if (!email) {
-      res.status(400).json({ message: '"email" is missing' });
+      res.status(400).json({ error: '"email" is missing' });
       return;
     }
     const result = await req.session.findAppByEmail(email);
@@ -322,32 +507,58 @@ export async function createServer() {
     });
   });
 
-  // POST to add an app
-  app.post('/apps', async function postApps(req, res) {
-    const newApp = req.body;
-    const company = newApp.company;
-    if (!company) {
-      res.status(400).json({ message: '"company" missing' });
-      return;
-    }
-    const added = await Lib.addApp(req.session, newApp);
-    if ('error' in added) {
-      res.status(400).json({
-        message: 'Failed to add app: ' + added.error
-      });
-    }
-    else {
-      res.json({
-        message: 'App added successfully',
-        app: added,
-      });
-    }
-  });
+  app.post('/apps',
+    /**
+     * Handles the creation of a new app.
+     * 
+     * This endpoint expects a JSON object in the request body with the app's details, including the company name.
+     * If the app is successfully created, it returns the created app object.
+     * 
+     * If the company name is missing or if the app name already exists, it returns a 400 status code with an error message.
+     *
+     * @api {post} /apps Create a new app
+     * @apiName PostApps
+     * @apiGroup Apps
+     *
+     * @apiParam {Object} requestBody The app object to be created.
+     * @apiParamExample {json} Request-Example:
+     * {
+     *   "company": "Example Company",
+     *   "appName": "Example App",
+     *   "plan": "Premium",
+     *   "email": "app@example.com"
+     * }
+     *
+     * @apiSuccess {Object} app The created app object.
+     * @apiSuccessExample {json} Success-Response:
+     * {
+     *   "company": "Example Company",
+     *   "appName": "Example App",
+     *   "plan": "Premium",
+     *   "email": "app@example.com",
+     *   "createdAt": "2023-04-01T00:00:00.000Z",
+     *   "upgradedAt": "2023-04-01T00:00:00.000Z",
+     *   "updatedAt": "2023-04-01T00:00:00.000Z"
+     * }
+     *
+     * @apiError (400) {String} error The error message indicating the failure to create the app.
+     *
+     * @apiExample {curl} Example usage:
+     *     curl -X POST -H "Content-Type: application/json" -d @requestBody.json http://localhost:3954/apps
+     */
+    async function postApps(req, res, next) {
+      const newApp = req.body;
+      const company = newApp.company;
+      if (!company) {
+        return res.status(400).json({ error: '"company" missing' });
+      }
+      const result = await Lib.addApp(req.session, newApp);
+      respondWithLibResult(req, res, next, result, app => ({ app }));
+    });
 
   // PUT to update an app
   app.put('/apps/:appName', async function putApps(req, res) {
     const attributes = req.body;
-    console.log(`PUT /apps/${req.params.appName}: ${JSON.stringify(attributes)}`);
     const added = await Lib.editApp(req.session, req.params.appName, attributes);
     if ('error' in added) {
       res.status(400).json({
@@ -363,14 +574,12 @@ export async function createServer() {
   });
 
   app.put('/config', async function putConfig(req, res) {
-    console.log('PUT /config');
     const attributes = req.body;
     const config = await Lib.editConfig(req.session, attributes);
     res.json(config);
   });
 
   app.get('/config', async function getConfig(req, res) {
-    console.log('GET /config');
     const session = await database.open();
     const config = await session.loadConfig();
     res.json(config);
@@ -378,30 +587,54 @@ export async function createServer() {
   });
 
   app.get('/config/staff', async function getConfigStaff(req, res) {
-    console.log('GET /config/staff');
     const staff = (await (await database.open()).loadConfig()).staff;
     res.json(staff);
   });
 
-  app.post('/config/staff', async function postConfigStaff(req, res) {
-    console.log('POST /config/staff');
-    const newStaff = req.body; // format: { "name": "User Full Name", "email": "email@domain.com" }
-    const added = await Lib.addStaff(req.session, newStaff);
-    if ('error' in added) {
-      res.status(400).json({ message: 'Failed to add staff: ' + added.error });
-    }
-    else {
-      res.json({
-        message: 'Staff added successfully',
-        staff: added,
-      });
-    }
-  });
+  app.post('/config/staff',
+    async function postConfigStaff(req, res, next) {
+      const newStaff = req.body; // format: { "name": "User Full Name", "email": "email@domain.com" }
+      const added = await Lib.addStaff(req.session, newStaff);
+      respondWithLibResult(req, res, next, added, staff => ({staff}));
+    });
+
+  app.get('/throw_an_exception',
+    /** For debugging, just throw an exception */
+    function throwAnException(req, res, next) {
+      throw new Error('Debug Throw');
+    });
+
+  app.get('/next_an_error',
+    /** For debugging, just call next with an error */
+    function throwAnException(req, res, next) {
+      next(new Error('Debug Next Error'));
+    });
+
+  app.get('*',
+    /** Catch requests to non existing endpoints */
+    function notFound(req, res, next) {
+      res.status(404).json({ error: 'endpoint not found' });
+    });
+
+  app.use(
+    /**
+     * Middleware function to handle errors in the application.
+     * 
+     * This function logs the error and sends a response with a 500 status code and the error message.
+     * It also calls the next middleware in the stack to ensure proper error handling flow.
+     */ 
+    function handleErrors(err: Error, req: express.Request, res: express.Response, next: express.NextFunction): void {
+      req.log.warn(err);
+      if (res.headersSent) {
+        return next(err)
+      }
+      res.status(500).json({ error: err?.message, error_name: err?.name });
+    });
 
   // Start the server
   app.listen(port, hostname, () => {
     const url = `http://admin:${apiKey}@${hostname}:${port}`;
-    console.log(`CRM API server running at ${url}\n`
+    console.log(`CRM API server running at ${url});\n`
       + `\n`
       + `Test some endpoints:\n`
       + ` - ${url}/config\n`

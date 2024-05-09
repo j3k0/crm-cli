@@ -60,7 +60,6 @@ export async function editApp(database: DatabaseSession, appName: string, attrib
     if ('error' in result) {
       return result;
     }
-    console.log('App updated.');
     return found.app;
 }
 
