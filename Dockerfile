@@ -19,4 +19,4 @@ VOLUME /app/data
 
 EXPOSE 80
 
-CMD node build/server
+CMD node build/crmApiServer
