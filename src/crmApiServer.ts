@@ -5,7 +5,8 @@ import { connectCrmDatabase } from './database';
 import { emptyDatabase } from './database/emptyDatabase';
 import { randomUUID } from 'crypto';
 import { CrmSession } from './crmSession';
-import { renderTemplateEmailForContact } from './lib';
+import { findContactByFilter, renderTemplateEmail, renderTemplateEmailForContact } from './lib';
+import { TemplateEmail } from './types';
 
 const log = bunyan.createLogger({
   name: 'crm-server',
@@ -604,7 +605,18 @@ export async function startCrmApiServer() {
 
   app.get('/config/templates', async function getConfigTemplates(req, res) {
     const templates = (await req.session.loadConfig()).templates || [];
-    res.json({templates});
+    const filter = req.query.renderFor;
+    if (filter) {
+      const elements = await findContactByFilter(req.session, '' + filter);
+      const rendered: TemplateEmail[] = [];
+      for (const template of templates) {
+        rendered.push(await renderTemplateEmail(template, elements));
+      }
+      res.json({templates: rendered});
+    }
+    else {
+      res.json({templates});
+    }
   });
 
   app.post('/config/templates',

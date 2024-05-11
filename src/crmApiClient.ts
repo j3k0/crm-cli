@@ -163,9 +163,14 @@ export class CrmApiClient {
     }
   }
 
-  async getTemplates(): Promise<{templates: TemplateEmail[]}> {
+  /**
+   * Fetch all templates
+   * 
+   * @param renderFor - render all templates for the provided contact (specify an email, app name or company name)
+   */
+  async getTemplates(renderFor?: string): Promise<{templates: TemplateEmail[]}> {
     try {
-      const response = await axios.get(`${this.baseUrl}/config/templates`);
+      const response = await axios.get(`${this.baseUrl}/config/templates${renderFor ? '?renderFor=' + encodeURIComponent(renderFor) : ''}`);
       return response.data;
     } catch (error) {
       console.error('Error fetching templates:', error);
