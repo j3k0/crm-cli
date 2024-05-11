@@ -281,9 +281,9 @@ export class CouchDBSession implements DatabaseSession {
     }
   }
 
-  async updateCompany(name: string, attributes: Partial<CompanyAttributes>): Promise<Company | { error: string; }> {
+  async updateCompany(name: string, attributes: Partial<CompanyAttributes & CouchDBDocument>): Promise<Company | { error: string; }> {
     try {
-      const docId = "company:" + md5(attributes.name || '');
+      const docId = attributes._id || ("company:" + md5(name || ''));
       const result = await axios.put<Company & CouchDBDocument>(`${this.url}/${docId}`, attributes);
       console.log('company ' + attributes.name + ' updated', result.data);
       return result.data;

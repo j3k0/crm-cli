@@ -56,6 +56,7 @@ export interface App {
 export interface Interaction {
     kind: string;
     from: string;
+    to?: string;
     summary: string;
     date: string; // ISODate
     updatedAt?: string; // ISODate
