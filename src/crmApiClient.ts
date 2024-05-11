@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { App, Company, CompanyAttributes, Config, Contact, Database, TemplateEmail } from './types';
+import { App, Company, CompanyAttributes, Config, Contact, Database, Interaction, TemplateEmail } from './types';
 
 /**
  * Client for the CrmApiServer
@@ -87,6 +87,16 @@ export class CrmApiClient {
       return response.data;
     } catch (error) {
       console.error('Error updating contact:', error);
+      throw error;
+    }
+  }
+
+  async addInteraction(interaction: Interaction & { company: string }): Promise<Interaction> {
+    try {
+      const response = await axios.post(`${this.baseUrl}/interactions`, interaction);
+      return response.data?.interaction;
+    } catch (error) {
+      console.error('Error adding interaction:', error);
       throw error;
     }
   }
