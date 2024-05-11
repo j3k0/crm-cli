@@ -189,7 +189,7 @@ export async function addInteraction(database: DatabaseSession, interaction: Int
       interactions: [
         ...company.interactions,
         interaction
-      ]
+      ].sort((a, b) => a.date == b.date ? 0 : a.date > b.date ? 1 : -1)
     });
     if ('error' in ret) return ret;
     console.log('Interaction added.');
@@ -215,7 +215,7 @@ export async function editInteraction(database: DatabaseSession, companyName: st
     updatedAt: new Date().toISOString(),
   });
   const result = await database.updateCompany(companyName, {
-    interactions: company.interactions
+    interactions: company.interactions.sort((a, b) => a.date == b.date ? 0 : a.date > b.date ? 1 : -1)
   });
   if ('error' in result) {
     return result;
