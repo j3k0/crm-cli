@@ -69,6 +69,10 @@ export class CrmSession implements DatabaseSession {
     return await editInteraction(await this.database(), companyName, index, attributes);
   }
 
+  async doneInteraction(companyName: string, index: number): Promise<Interaction | { error: string }> {
+    return await editInteraction(await this.database(), companyName, index, { followUpDate: '' });
+  }
+
   async dump(): Promise<Database> {
       return (await this.database()).dump();
   }

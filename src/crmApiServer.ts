@@ -414,6 +414,56 @@ export async function startCrmApiServer() {
       respondWithLibResult(req, res, next, result, interaction => ({ interaction }));
     });
 
+  // PUT to update an interaction
+  app.put('/interactions/:companyName/:index',
+    /**
+     * @param {express.Request} req - The Express request object.
+     * @param {express.Response} res - The Express response object.
+     * @param {express.NextFunction} next - The next middleware function in the stack.
+     * @returns {void}
+     */
+    async function updateInteractionMiddleware(req, res, next) {
+      const company = req.params.companyName;
+      const index = parseInt(req.params.index);
+      const result = await req.session.updateInteraction(company, index, req.body);
+      respondWithLibResult(req, res, next, result, interaction => ({ interaction }));
+    });
+
+  // POST to clear followup date for an interaction
+  app.post('/interactions/:companyName/:index/done',
+    /**
+     * @param {express.Request} req - The Express request object.
+     * @param {express.Response} res - The Express response object.
+     * @param {express.NextFunction} next - The next middleware function in the stack.
+     * @returns {void}
+     */
+    async function doneInteractionMiddleware(req, res, next) {
+      const company = req.params.companyName;
+      const index = parseInt(req.params.index);
+      const result = await req.session.doneInteraction(company, index);
+      respondWithLibResult(req, res, next, result, interaction => ({ interaction }));
+    });
+
+  app.get('/followups',
+    /**
+     * @param {express.Request} req - The Express request object.
+     * @param {express.Response} res - The Express response object.
+     * @returns {void}
+     */
+    async function getFollowups(req, res) {
+      const startDate = req.query.start_date ? '' + req.query.start_date : undefined;
+      const endDate = req.query.end_date ? '' + req.query.end_date : undefined;
+      if (!startDate || !endDate) {
+        return res.status(400).json({ error: 'start_date and end_date are required' });
+      }
+      const followups = await req.session.findFollowups(startDate, endDate);
+      res.json({
+        followups
+      });
+      res.end();
+    });
+
+
   // GET endpoint to retrieve all contacts
   // app.get('/contacts', async function getContacts(req, res) {
   //   res.json({
@@ -579,19 +629,6 @@ export async function startCrmApiServer() {
         app: added,
       });
     }
-  });
-
-  app.get('/followups', async function getFollowups(req, res) {
-    const startDate = req.query.start_date ? '' + req.query.start_date : undefined;
-    const endDate = req.query.end_date ? '' + req.query.end_date : undefined;
-    if (!startDate || !endDate) {
-      return res.status(400).json({error: 'start_date and end_date are required'});
-    }
-    const followups = await req.session.findFollowups(startDate, endDate);
-    res.json({
-      followups
-    });
-    res.end();
   });
 
   app.put('/config', async function putConfig(req, res) {

@@ -56,6 +56,32 @@ export class CrmApiClient {
     }
   }
 
+  async updateInteraction(companyName: string, index: number, attributes: Partial<Interaction>): Promise<Interaction | { error: string }> {
+    try {
+      const response = await axios.put(`${this.baseUrl}/interactions/${encodeURIComponent(companyName)}/${index}`, attributes);
+      if (response.data.interaction) {
+        return response.data.interaction;
+      }
+      else return {error: 'interaction not updated'};
+    } catch (error) {
+      console.error('Error in update interaction:', error);
+      throw error;
+    }
+  }
+
+  async doneInteraction(companyName: string, index: number): Promise<Interaction | { error: string }> {
+    try {
+      const response = await axios.post(`${this.baseUrl}/interactions/${encodeURIComponent(companyName)}/${index}/done`);
+      if (response.data.interaction) {
+        return response.data.interaction;
+      }
+      else return {error: 'interaction not done'};
+    } catch (error) {
+      console.error('Error in done interaction:', error);
+      throw error;
+    }
+  }
+
   async updateCompany(name: string, attributes: Partial<CompanyAttributes>): Promise<Company | undefined> {
     try {
       const response = await axios.put(`${this.baseUrl}/companies/${encodeURIComponent(name)}`, attributes);
