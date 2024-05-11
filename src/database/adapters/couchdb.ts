@@ -119,7 +119,12 @@ export class CouchDBSession implements DatabaseSession {
 
   async findAppByEmail(email: string): Promise<{ company: Company; app: App; } | undefined> {
     try {
-      const url = `${this.url}/_design/companies/_view/by_email?include_docs=true`;
+      const query = new URLSearchParams({
+        key: JSON.stringify(email),
+        limit: '1',
+        include_docs: 'true'
+      }).toString();
+      const url = `${this.url}/_design/companies/_view/by_email?${query}`;
       const result = await axios.get<CouchDBViewResult<CompanyAttributes, 1>>(url);
       for (const row of result.data.rows) {
         const company = new Company(row.doc);
@@ -134,7 +139,12 @@ export class CouchDBSession implements DatabaseSession {
 
   async findAppByName(appName: string): Promise<{ company: Company; app: App; } | undefined> {
     try {
-      const url = `${this.url}/_design/companies/_view/by_app_name?limit=1&include_docs=true`;
+      const query = new URLSearchParams({
+        key: JSON.stringify(appName),
+        limit: '1',
+        include_docs: 'true'
+      }).toString();
+      const url = `${this.url}/_design/companies/_view/by_app_name?${query}`;
       const result = await axios.get<CouchDBViewResult<CompanyAttributes, 1>>(url);
       if (result.data.rows.length > 0) {
         const company = new Company(result.data.rows[0].doc);
@@ -182,7 +192,12 @@ export class CouchDBSession implements DatabaseSession {
 
   async findContactByEmail(email: string): Promise<{ company: Company; contact: Contact; } | undefined> {
     try {
-      const url = `${this.url}/_design/companies/_view/by_email?include_docs=true`;
+      const query = new URLSearchParams({
+        key: JSON.stringify(email),
+        limit: '1',
+        include_docs: 'true'
+      }).toString();
+      const url = `${this.url}/_design/companies/_view/by_email?${query}`;
       const result = await axios.get<CouchDBViewResult<CompanyAttributes, 1>>(url);
       for (const row of result.data.rows) {
         const company = new Company(row.doc);
