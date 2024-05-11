@@ -1,4 +1,4 @@
-import { App, Company, CompanyAttributes, Config, Contact, Database } from "../types";
+import { App, Company, CompanyAttributes, Config, Contact, Database, Interaction } from "../types";
 
 /**
  * Typically a session is associated with a single operation / request
@@ -17,6 +17,7 @@ export interface DatabaseSession {
   findAppByName(appName: string): Promise<{company: Company, app: App} | undefined>;
   findAppByEmail(email: string): Promise<{company: Company, app: App} | undefined>;
   findContactByEmail(email: string): Promise<{company: Company, contact: Contact} | undefined>;
+  findFollowups(startDate: string, endDate: string): Promise<(Interaction & { company: string })[]>;
   searchCompanies(filter: string): Promise<Company[]>;
 
   // configuration

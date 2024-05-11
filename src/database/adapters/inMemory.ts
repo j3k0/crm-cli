@@ -1,5 +1,5 @@
 import { companies } from "../../queries/companies";
-import { App, Company, CompanyAttributes, Config, Contact, Database } from "../../types";
+import { App, Company, CompanyAttributes, Config, Contact, Database, Interaction } from "../../types";
 import { emptyDatabase } from "../emptyDatabase";
 import { DatabaseAdapter, DatabaseSession } from "../types";
 
@@ -100,6 +100,18 @@ export class InMemorySession implements DatabaseSession {
           const contact = company.contacts.find(contact => contact.email?.toLowerCase() === email);
           if (contact) return { contact, company };
       }, undefined as ({ company: Company; contact: Contact; } | undefined));
+  }
+
+  async findFollowups(startDate: string, endDate: string): Promise<(Interaction & { company: string; })[]> {
+    return this.database.companies.reduce((arr, company) => {
+        company.interactions.forEach(i => {
+            if (i.followUpDate && i.followUpDate >= startDate && i.followUpDate <= endDate) arr.push({
+                ...i,
+                company: company.name
+            });
+        });
+        return arr;
+    }, [] as (Interaction & { company: string; })[]);
   }
 
   async loadConfig(): Promise<Config> {

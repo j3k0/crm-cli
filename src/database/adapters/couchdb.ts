@@ -1,8 +1,7 @@
 import axios from "axios";
-import { App, Company, CompanyAttributes, Config, Contact, Database } from "../../types";
+import { App, Company, CompanyAttributes, Config, Contact, Database, Interaction } from "../../types";
 import { DatabaseSessionCache } from "./sessionCache";
 import { DatabaseAdapter, DatabaseSession } from "../types";
-import { emptyDatabase } from "../emptyDatabase";
 import { md5 } from "../../utils/md5";
 import { designDocument } from "./couchdbDesign";
 import Fuse from "fuse.js";
@@ -179,6 +178,7 @@ export class CouchDBSession implements DatabaseSession {
       const url = `${this.url}/_design/companies/_view/by_name?${query}`;
       const result = await axios.get<CouchDBViewResult<CompanyAttributes, 1>>(url);
       if (result.data.rows.length > 0) {
+        // console.error('findCompanyByName', result.data.rows[0]);
         return new Company(result.data.rows[0].doc);
       }
       else {
@@ -207,6 +207,33 @@ export class CouchDBSession implements DatabaseSession {
     }
     catch (err) {
       return this.handleFindErrors('findContactByEmail', err);
+    }
+  }
+
+  async findFollowups(startDate: string, endDate: string): Promise<(Interaction & { company: string; })[]> {
+    try {
+      const query = new URLSearchParams({
+        start_key: JSON.stringify(startDate.slice(0, 10)),
+        end_key: JSON.stringify(endDate.slice(0, 10) + 'Z'),
+        inclusive_end: 'true',
+        include_docs: 'true'
+      }).toString();
+      const url = `${this.url}/_design/companies/_view/by_followup_date?${query}`;
+      const result = await axios.get<CouchDBViewResult<CompanyAttributes, number>>(url);
+      const ret: (Interaction & { company: string; })[] = [];
+      for (const row of result.data.rows) {
+        const company = row.doc;
+        const index = row.value;
+        const interaction = company.interactions ? company.interactions[index] : undefined;
+        if (interaction) ret.push({
+          ...interaction,
+          company: company.name
+        });
+      }
+      return ret;
+    }
+    catch (err) {
+      return (await this.handleFindErrors('findFollowups', err)) || [];
     }
   }
 

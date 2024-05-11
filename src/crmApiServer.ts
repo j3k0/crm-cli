@@ -581,6 +581,19 @@ export async function startCrmApiServer() {
     }
   });
 
+  app.get('/followups', async function getFollowups(req, res) {
+    const startDate = req.query.start_date ? '' + req.query.start_date : undefined;
+    const endDate = req.query.end_date ? '' + req.query.end_date : undefined;
+    if (!startDate || !endDate) {
+      return res.status(400).json({error: 'start_date and end_date are required'});
+    }
+    const followups = await req.session.findFollowups(startDate, endDate);
+    res.json({
+      followups
+    });
+    res.end();
+  });
+
   app.put('/config', async function putConfig(req, res) {
     const attributes = req.body;
     const config = await req.session.updateConfig(attributes);

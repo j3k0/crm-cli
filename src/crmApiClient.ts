@@ -42,6 +42,20 @@ export class CrmApiClient {
     }
   }
 
+  async findFollowups(startDate: string, endDate: string): Promise<(Interaction & { company: string; })[]> {
+    try {
+      const query = new URLSearchParams({
+        start_date: startDate,
+        end_date: endDate
+      }).toString();
+      const response = await axios.get(`${this.baseUrl}/followups?${query}`);
+      return response.data?.followups || [];
+    } catch (error) {
+      console.error('Error fetching company:', error);
+      throw error;
+    }
+  }
+
   async updateCompany(name: string, attributes: Partial<CompanyAttributes>): Promise<Company | undefined> {
     try {
       const response = await axios.put(`${this.baseUrl}/companies/${encodeURIComponent(name)}`, attributes);

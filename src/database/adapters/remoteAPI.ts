@@ -1,5 +1,5 @@
 import { CrmApiClient, crmApiClient } from "../../crmApiClient";
-import { App, Company, CompanyAttributes, Config, Contact, Database } from "../../types";
+import { App, Company, CompanyAttributes, Config, Contact, Database, Interaction } from "../../types";
 import { DatabaseSessionCache } from "./sessionCache";
 import { DatabaseAdapter, DatabaseSession } from "../types";
 
@@ -78,6 +78,10 @@ export class RemoteApiSession implements DatabaseSession {
     return this.catch404(this.client.findContactByEmail(email), async contact => ({
       contact, company: await this.companyOf(contact)
     }));
+  }
+
+  findFollowups(startDate: string, endDate: string): Promise<(Interaction & { company: string; })[]> {
+    return this.client.findFollowups(startDate, endDate);
   }
 
   async loadConfig(): Promise<Config> {
