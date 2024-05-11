@@ -1,6 +1,6 @@
-import moment from "moment";
 import * as fs from 'fs';
 import { DatabaseSession } from "../../database";
+import { findContactByFilter, renderTemplateText } from "../../lib";
 
 export async function templateHelp(database: DatabaseSession, arg: string) {
   return { printAsText: async () => console.log(`
@@ -37,64 +37,18 @@ export async function template(database: DatabaseSession, arg: string) {
 //   const filteredContact: ContactsResult[] = contacts(data, filter).content;
 //   const filteredCompany: Company[] = companies(data, filter).content;
 
-  let { contact, company, app } = await findEntities(database, filter);
+  let { contact, company, app } = await findContactByFilter(database, filter);
 
   if (!contact && company) {
       contact = company.contacts[0];
   }
 
-  if (contact) {
-      const defaultName = company?.name || app?.appName || 'user';
-      const friendlyName = contact.firstName || defaultName;
-      const name = `${contact.firstName} ${contact.lastName}`.replace(/(^ )|( $)/g, '') || defaultName;
-      content = content.replace(new RegExp('{{EMAIL}}', 'g'), `${contact.email}`);
-      content = content.replace(new RegExp('{{FULL_EMAIL}}', 'g'), `"${name}" <${contact.email}>`);
-      content = content.replace(new RegExp('{{FULL_NAME}}', 'g'), name);
-      content = content.replace(new RegExp('{{NAME}}', 'g'), name);
-      content = content.replace(new RegExp('{{FRIENDLY_NAME}}', 'g'), friendlyName);
-      content = content.replace(new RegExp('{{FIRST_NAME}}', 'g'), contact.firstName || '');
-      content = content.replace(new RegExp('{{LAST_NAME}}', 'g'), contact.lastName || '');
+  if (!contact) {
+    throw 'ERROR: No contact found.';
   }
-  if (app) {
-      content = content.replace(new RegExp('{{APP_NAME}}', 'g'), app.appName);
-      content = content.replace(new RegExp('{{APP_PLAN}}', 'g'), app.plan);
-      content = content.replace(new RegExp('{{REGISTRATION_AGO}}', 'g'), moment(new Date(app.createdAt)).fromNow());
-      content = content.replace(new RegExp('{{SUBSCRIPTION_AGO}}', 'g'), app.upgradedAt ? moment(new Date(app.upgradedAt)).fromNow() : '(never upgraded)');
-  }
-  if (company) {
-      content = content.replace(new RegExp('{{COMPANY_AGO}}', 'g'), company.createdAt ? moment(new Date(company.createdAt)).fromNow() : '(unknown)');
-      content = content.replace(new RegExp('{{COMPANY_NAME}}', 'g'), company.name);
-      content = content.replace(new RegExp('{{COMPANY_URL}}', 'g'), company.url);
-      content = content.replace(new RegExp('{{COMPANY_ADDRESS}}', 'g'), company.address || '');
-  }
+
+  content = renderTemplateText(content, {app, contact, company});
   return {
       printAsText: async () => console.log(content)
   };
 }
-async function findEntities(database: DatabaseSession, filter: string) {
-    const app = (await database.findAppByName(filter)) || (await database.findAppByEmail(filter));
-
-    // If any results are non-ambiguous
-    if (app) {
-        const contact = await database.findContactByEmail(app.app.email);
-        return { app: app.app, contact: contact?.contact, company: app.company }
-    }
-
-    const contact = await database.findContactByEmail(filter);
-    if (contact) {
-        const company = contact.company;
-        return { company, app: company?.apps[0], contact: contact.contact };
-    }
-
-    let company = await database.findCompanyByName(filter);
-    if (company) {
-        return {
-            company,
-            contact: company.contacts[0],
-            apps: company.apps[0],
-        }
-    }
-
-    throw 'ERROR: No contact found.';
-}
-

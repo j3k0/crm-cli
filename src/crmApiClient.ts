@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { App, Company, CompanyAttributes, Config, Contact, Database } from './types';
+import { App, Company, CompanyAttributes, Config, Contact, Database, TemplateEmail } from './types';
 
 /**
  * Client for the CrmApiServer
@@ -157,6 +157,45 @@ export class CrmApiClient {
     try {
       const response = await axios.put(`${this.baseUrl}/config`, attributes);
       return response.data;
+    } catch (error) {
+      console.error('Error updating config apps:', error);
+      throw error;
+    }
+  }
+
+  async getTemplates(): Promise<{templates: TemplateEmail[]}> {
+    try {
+      const response = await axios.get(`${this.baseUrl}/config/templates`);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching templates:', error);
+      throw error;
+    }
+  }
+
+  async addTemplate(attributes: TemplateEmail): Promise<TemplateEmail | undefined> {
+    try {
+      const response = await axios.post(`${this.baseUrl}/config/templates`, attributes);
+      if (response.data.error) {
+        throw new Error(response.data.error);
+      }
+      return response.data.template;
+    } catch (error) {
+      console.error('Error updating config apps:', error);
+      throw error;
+    }
+  }
+
+  async renderTemplate(template: TemplateEmail, filter: string): Promise<TemplateEmail> {
+    try {
+      const response = await axios.post(`${this.baseUrl}/render-template`, {
+        template,
+        filter,
+      });
+      if (response.data.error) {
+        throw new Error(response.data.error);
+      }
+      return response.data.template;
     } catch (error) {
       console.error('Error updating config apps:', error);
       throw error;

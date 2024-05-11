@@ -1,10 +1,16 @@
+export interface TemplateEmail {
+    subject: string;
+    content: string;
+}
+
 export interface Config {
     subscriptionPlans: string[];
     staff: { [email: string]: string };
     interactions: {
         kinds: string[];
         tags: string[];
-    }
+    };
+    templates?: TemplateEmail[];
 }
 
 export interface Database {

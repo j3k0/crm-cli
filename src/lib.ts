@@ -1,5 +1,6 @@
+import moment from "moment";
 import { DatabaseAdapter, DatabaseSession, connectCrmDatabase } from "./database";
-import { App, Company, CompanyAttributes, Config, Contact, Interaction } from "./types";
+import { App, Company, CompanyAttributes, Config, Contact, Interaction, TemplateEmail } from "./types";
 
 export async function addCompany(database: DatabaseSession, company: Partial<CompanyAttributes>): Promise<Company | {error: string}> {
 
@@ -227,7 +228,20 @@ export interface StaffDefinition {
   email: string;
 }
 
-export async function addStaff(database: DatabaseSession, staff: Partial<StaffDefinition>): Promise<{ [email: string]: string } | { error: string }> {
+export async function addTemplate(database: DatabaseSession, template: TemplateEmail): Promise<TemplateEmail | { error: string }> {
+  if (template.content && template.subject) {
+    const config = await database.loadConfig();
+    if (!config.templates) config.templates = [];
+    config.templates.push(template);
+    await database.updateConfig({templates: config.templates});
+    return template;
+  }
+  else {
+    return {error: 'incomplete data: subject or content is missing'};
+  }
+}
+
+export async function addStaff(database: DatabaseSession, staff: StaffDefinition): Promise<{ [email: string]: string } | { error: string }> {
   if (staff.name && staff.email) {
     const config = await database.loadConfig();
     config.staff[staff.email] = staff.name;
@@ -243,6 +257,96 @@ export async function editConfig(database: DatabaseSession, attributes: Partial<
     return await database.updateConfig(attributes);
 }
 
+/**
+ * Here are the available template fields.
+ * 
+ *  - {{EMAIL}} .............. Contact's raw email (example: user@example.com
+ *  - {{FULL_EMAIL}} ......... Contact's full email (example: Jon Snow <jon.snow@example.com>)
+ *  - {{FULL_NAME}} .......... Contact's full name (example: Henry Ford)
+ *  - {{NAME}} ............... Alias to {{FULL_NAME}}
+ *  - {{FIRST_NAME}} ......... Contact's first name
+ *  - {{LAST_NAME}} .......... Contact's last name
+ *  - {{FRIENDLY_NAME}} ...... Contact's first name, company name when unknown.
+ *  - {{APP_NAME}} ........... The appName
+ *  - {{APP_PLAN}} ........... The plan user's is registered to
+ *  - {{REGISTRATION_AGO}} ... Time since registration (example: 2 days ago)
+ *  - {{SUBSCRIPTION_AGO}} ... Time since subscription
+ *  - {{COMPANY_AGO}} ........ Time since first contact with the company
+ *  - {{COMPANY_NAME}} ....... Name of the company
+ *  - {{COMPANY_URL}} ........ Company's URL
+ *  - {{COMPANY_ADDRESS}} .... Company's website
+ */
+export function renderTemplateText(content: string, elements: { app?: App, contact?: Contact, company?: Company }): string {
+    const { app, contact, company } = elements;
+    if (contact) {
+        const defaultName = company?.name || app?.appName || 'user';
+        const friendlyName = contact.firstName || defaultName;
+        const name = `${contact.firstName} ${contact.lastName}`.replace(/(^ )|( $)/g, '') || defaultName;
+        content = content.replace(new RegExp('{{EMAIL}}', 'g'), `${contact.email}`);
+        content = content.replace(new RegExp('{{FULL_EMAIL}}', 'g'), `"${name}" <${contact.email}>`);
+        content = content.replace(new RegExp('{{FULL_NAME}}', 'g'), name);
+        content = content.replace(new RegExp('{{NAME}}', 'g'), name);
+        content = content.replace(new RegExp('{{FRIENDLY_NAME}}', 'g'), friendlyName);
+        content = content.replace(new RegExp('{{FIRST_NAME}}', 'g'), contact.firstName || '');
+        content = content.replace(new RegExp('{{LAST_NAME}}', 'g'), contact.lastName || '');
+    }
+    if (app) {
+        content = content.replace(new RegExp('{{APP_NAME}}', 'g'), app.appName);
+        content = content.replace(new RegExp('{{APP_PLAN}}', 'g'), app.plan);
+        content = content.replace(new RegExp('{{REGISTRATION_AGO}}', 'g'), moment(new Date(app.createdAt)).fromNow());
+        content = content.replace(new RegExp('{{SUBSCRIPTION_AGO}}', 'g'), app.upgradedAt ? moment(new Date(app.upgradedAt)).fromNow() : '(never upgraded)');
+    }
+    if (company) {
+        content = content.replace(new RegExp('{{COMPANY_AGO}}', 'g'), company.createdAt ? moment(new Date(company.createdAt)).fromNow() : '(unknown)');
+        content = content.replace(new RegExp('{{COMPANY_NAME}}', 'g'), company.name);
+        content = content.replace(new RegExp('{{COMPANY_URL}}', 'g'), company.url);
+        content = content.replace(new RegExp('{{COMPANY_ADDRESS}}', 'g'), company.address || '');
+    }
+    return content;
+}
+
+/**
+ * @param filter - Email, App Name or Company Name
+ */
+export async function findContactByFilter(database: DatabaseSession, filter: string): Promise<{app?: App; contact?: Contact; company?: Company }> {
+    const app = (await database.findAppByName(filter)) || (await database.findAppByEmail(filter));
+
+    // If any results are non-ambiguous
+    if (app) {
+        const contact = await database.findContactByEmail(app.app.email);
+        return { app: app.app, contact: contact?.contact, company: app.company }
+    }
+
+    const contact = await database.findContactByEmail(filter);
+    if (contact) {
+        const company = contact.company;
+        return { company, app: company?.apps[0], contact: contact.contact };
+    }
+
+    let company = await database.findCompanyByName(filter);
+    if (company) {
+        return {
+            company,
+            contact: company.contacts[0],
+            app: company.apps[0],
+        }
+    }
+
+    return {};
+}
+
+export function renderTemplateEmail(email: TemplateEmail, elements: { app?: App, contact?: Contact, company?: Company }): TemplateEmail {
+  return {
+    subject: renderTemplateText(email.subject, elements),
+    content: renderTemplateText(email.content, elements),
+  };
+}
+
+export async function renderTemplateEmailForContact(database: DatabaseSession, filter: string, email: TemplateEmail): Promise<TemplateEmail> {
+  const elements = await findContactByFilter(database, filter);
+  return renderTemplateEmail(email, elements);
+}
+
 export default {
 
   addCompany,
@@ -256,4 +360,6 @@ export default {
   editCompany,
   editContact,
   editInteraction,
+
+  renderTemplateText,
 }

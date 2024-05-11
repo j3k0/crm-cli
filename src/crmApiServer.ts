@@ -5,6 +5,7 @@ import { connectCrmDatabase } from './database';
 import { emptyDatabase } from './database/emptyDatabase';
 import { randomUUID } from 'crypto';
 import { CrmSession } from './crmSession';
+import { renderTemplateEmailForContact } from './lib';
 
 const log = bunyan.createLogger({
   name: 'crm-server',
@@ -599,6 +600,25 @@ export async function startCrmApiServer() {
       const newStaff = req.body; // format: { "name": "User Full Name", "email": "email@domain.com" }
       const added = await req.session.addStaff(newStaff);
       respondWithLibResult(req, res, next, added, staff => ({staff}));
+    });
+
+  app.get('/config/templates', async function getConfigTemplates(req, res) {
+    const templates = (await req.session.loadConfig()).templates || [];
+    res.json({templates});
+  });
+
+  app.post('/config/templates',
+    async function postConfigTemplates(req, res, next) {
+      const newTemplate = req.body; // format: { "content": "Email Content", "subject": "Email Subject" }
+      const added = await req.session.addTemplate(newTemplate);
+      respondWithLibResult(req, res, next, added, template => ({template}));
+    });
+
+  app.post('/render-template',
+    async function postRenderTemplate(req, res, next) {
+      const {template, filter} = req.body;
+      const result = await renderTemplateEmailForContact(req.session, template, filter);
+      res.json({template: result});
     });
 
   app.get('/throw_an_exception',

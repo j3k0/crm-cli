@@ -1,7 +1,7 @@
 import { connectCrmDatabase } from "./database";
 import { DatabaseAdapter, DatabaseSession } from "./database/types";
-import { StaffDefinition, addApp, addCompany, addContact, addInteraction, addStaff, editApp, editCompany, editConfig, editContact, editInteraction } from "./lib";
-import { App, Company, CompanyAttributes, Config, Contact, Database, Interaction } from "./types";
+import { StaffDefinition, addApp, addCompany, addContact, addInteraction, addStaff, addTemplate, editApp, editCompany, editConfig, editContact, editInteraction } from "./lib";
+import { App, Company, CompanyAttributes, Config, Contact, Database, Interaction, TemplateEmail } from "./types";
 
 export class CrmSession implements DatabaseSession {
 
@@ -41,8 +41,12 @@ export class CrmSession implements DatabaseSession {
     return await addInteraction(await this.database(), interaction);
   }
 
-  async addStaff(staff: Partial<StaffDefinition>): Promise<{ [email: string]: string } | { error: string }> {
+  async addStaff(staff: StaffDefinition): Promise<{ [email: string]: string } | { error: string }> {
     return await addStaff(await this.database(), staff);
+  }
+
+  async addTemplate(template: TemplateEmail): Promise<TemplateEmail | { error: string }> {
+    return await addTemplate(await this.database(), template);
   }
 
   async updateConfig(attributes: Partial<Config>) {
