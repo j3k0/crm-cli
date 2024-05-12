@@ -42,6 +42,10 @@ export async function startCrmApiServer() {
       next();
     });
 
+  app.get('/', function healthCheck(req, res, next) {
+    res.json({ok: true}).end();
+  });
+
   /**
    * Middleware function to authenticate incoming requests.
    * 
@@ -694,10 +698,6 @@ export async function startCrmApiServer() {
     function throwAnException(req, res, next) {
       next(new Error('Debug Next Error'));
     });
-
-  app.get('/', function healthCheck(req, res, next) {
-    res.json({ok: true}).end();
-  });
 
   app.get('*',
     /** Catch requests to non existing endpoints */
