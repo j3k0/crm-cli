@@ -1,6 +1,11 @@
 # crm-cli
 
-A command-line Customer Relationship Management software.
+> A command-line Customer Relationship Management software.
+
+ * Works as a standalone local cli tool or client /  server for multi-users
+ * With or withhout a database, supporting:
+   * data as a singe JSON file
+   * [CouchDB](https://couchdb.apache.org/)
 
 ## Who is it for?
 
@@ -74,7 +79,7 @@ Available commands:
 
 ## Non-local usage
 
-CRM cli features client server architecture.
+CRM cli also features a client server architecture.
 
 You can launch a server:
 
@@ -95,6 +100,7 @@ crm init-crm
 ```
 
 Notice that the CRM server doesn't support SSL, so it's strongly recommended you only expose it through a reverse proxy.
+
 
 ## Docker
 
@@ -127,7 +133,7 @@ Examples:
 
 ## DATABASE_URL
 
-The DATABASE_URL environment variable sets the connection to the database.
+The `DATABASE_URL` environment variable sets the connection to the database.
 
 Possible values:
 
