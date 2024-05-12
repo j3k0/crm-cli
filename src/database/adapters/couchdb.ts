@@ -249,10 +249,17 @@ export class CouchDBSession implements DatabaseSession {
 
   async searchCompanies(filter: string): Promise<Company[]> {
     const companyNames = await this.allCompanyNames();
-    const filtered = new Fuse(companyNames).search(filter);
+    const filtered = new Fuse(companyNames.map(name => ({name})), {
+      keys: ['name'],
+      matchAllTokens: true,
+      threshold: 0.1,
+      location: 0,
+      distance: 500,
+      findAllMatches: true,
+    }).search(filter);
     const ret:Company[] = [];
-    for (const name of filtered) {
-      const company = await this.findCompanyByName(name);
+    for (const result of filtered) {
+      const company = await this.findCompanyByName(result.name);
       if (company) ret.push(company);
     }
     return ret;

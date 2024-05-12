@@ -180,11 +180,11 @@ export async function startCrmApiServer() {
       next();
     });
 
-  // app.get('/companies/search/:filter', async function getSearchCompanies(req, res) {
-  //   res.json({
-  //     rows: await req.session.searchCompanies(req.params.filter).content
-  //   });
-  // });
+  app.get('/companies/search/:filter', async function getSearchCompanies(req, res) {
+    res.json({
+      rows: await req.session.searchCompanies(req.params.filter)
+    });
+  });
 
   app.get('/dump', async function getDump(req, res) {
     res.json(await req.session.dump());
