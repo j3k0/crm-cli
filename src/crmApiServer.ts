@@ -695,6 +695,10 @@ export async function startCrmApiServer() {
       next(new Error('Debug Next Error'));
     });
 
+  app.get('/', function healthCheck(req, res, next) {
+    res.json({ok: true}).end();
+  });
+
   app.get('*',
     /** Catch requests to non existing endpoints */
     function notFound(req, res, next) {
