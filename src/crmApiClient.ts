@@ -51,7 +51,21 @@ export class CrmApiClient {
       const response = await axios.get(`${this.baseUrl}/followups?${query}`);
       return response.data?.followups || [];
     } catch (error) {
-      console.error('Error fetching company:', error);
+      console.error('Error fetching followups:', error);
+      throw error;
+    }
+  }
+
+  async findInteractions(startDate: string, endDate: string): Promise<(Interaction & { company: string; })[]> {
+    try {
+      const query = new URLSearchParams({
+        start_date: startDate,
+        end_date: endDate
+      }).toString();
+      const response = await axios.get(`${this.baseUrl}/interactions?${query}`);
+      return response.data?.followups || [];
+    } catch (error) {
+      console.error('Error fetching interactions:', error);
       throw error;
     }
   }

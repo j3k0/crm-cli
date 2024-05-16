@@ -448,6 +448,26 @@ export async function startCrmApiServer() {
       respondWithLibResult(req, res, next, result, interaction => ({ interaction }));
     });
 
+  app.get('/interactions',
+    /**
+     * @param {express.Request} req - The Express request object.
+     * @param {express.Response} res - The Express response object.
+     * @returns {void}
+     */
+    async function getInteractions(req, res) {
+      const startDate = req.query.start_date ? '' + req.query.start_date : undefined;
+      const endDate = req.query.end_date ? '' + req.query.end_date : undefined;
+      if (!startDate || !endDate) {
+        return res.status(400).json({ error: 'start_date and end_date are required' });
+      }
+      const interactions = await req.session.findInteractions(startDate, endDate);
+      res.json({
+        interactions
+      });
+      res.end();
+    });
+
+
   app.get('/followups',
     /**
      * @param {express.Request} req - The Express request object.

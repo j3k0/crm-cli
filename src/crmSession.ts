@@ -96,6 +96,10 @@ export class CrmSession implements DatabaseSession {
   async findFollowups(startDate: string, endDate: string): Promise<(Interaction & { company: string; })[]> {
     return await (await this.database()).findFollowups(startDate, endDate);
   }
+  
+  async findInteractions(startDate: string, endDate: string): Promise<(Interaction & { company: string; })[]> {
+    return await (await this.database()).findInteractions(startDate, endDate);
+  }
 
   async searchCompanies(filter: string): Promise<Company[]> {
     return await (await this.database()).searchCompanies(filter);

@@ -237,6 +237,34 @@ export class CouchDBSession implements DatabaseSession {
     }
   }
 
+  async findInteractions(startDate: string, endDate: string): Promise<(Interaction & { company: string; })[]> {
+    try {
+      const query = new URLSearchParams({
+        start_key: JSON.stringify(startDate.slice(0, 10)),
+        end_key: JSON.stringify(endDate.slice(0, 10) + 'Z'),
+        inclusive_end: 'true',
+        include_docs: 'true'
+      }).toString();
+      const url = `${this.url}/_design/companies/_view/by_interaction_date?${query}`;
+      const result = await axios.get<CouchDBViewResult<CompanyAttributes, number>>(url);
+      const ret: (Interaction & { company: string; })[] = [];
+      for (const row of result.data.rows) {
+        const company = row.doc;
+        const index = row.value;
+        const interaction = company.interactions ? company.interactions[index] : undefined;
+        if (interaction) ret.push({
+          ...interaction,
+          company: company.name
+        });
+      }
+      return ret;
+    }
+    catch (err) {
+      return (await this.handleFindErrors('findInteractions', err)) || [];
+    }
+  }
+
+
   async loadConfig(): Promise<Config> {
     const result = await axios.get<CouchDBDocument & Config>(`${this.url}/config`);
     return result.data;

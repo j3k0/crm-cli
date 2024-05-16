@@ -17,7 +17,10 @@ export interface DatabaseSession {
   findAppByName(appName: string): Promise<{company: Company, app: App} | undefined>;
   findAppByEmail(email: string): Promise<{company: Company, app: App} | undefined>;
   findContactByEmail(email: string): Promise<{company: Company, contact: Contact} | undefined>;
+  /** find all followup due within a given date range */
   findFollowups(startDate: string, endDate: string): Promise<(Interaction & { company: string })[]>;
+  /** find all interactions within a given date range */
+  findInteractions(startDate: string, endDate: string): Promise<(Interaction & { company: string })[]>;
   searchCompanies(filter: string): Promise<Company[]>;
 
   // configuration

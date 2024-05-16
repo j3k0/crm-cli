@@ -84,6 +84,10 @@ export class RemoteApiSession implements DatabaseSession {
     return this.client.findFollowups(startDate, endDate);
   }
 
+  findInteractions(startDate: string, endDate: string): Promise<(Interaction & { company: string; })[]> {
+    return this.client.findInteractions(startDate, endDate);
+  }
+
   async loadConfig(): Promise<Config> {
     const config = await this.client.getConfig();
     if (!config) throw new Error('failed to load config (empty)');

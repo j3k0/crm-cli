@@ -100,6 +100,12 @@ export class DatabaseSessionCache implements DatabaseSession {
       : await this.session.findFollowups(startDate, endDate);
   }
 
+  async findInteractions(startDate: string, endDate: string) {
+    return this.isDump
+      ? await this.updateMemory().findInteractions(startDate, endDate)
+      : await this.session.findInteractions(startDate, endDate);
+  }
+
   async findContactByEmail(email: string): Promise<{ company: Company; contact: Contact; } | undefined> {
     return await this.updateMemory().findContactByEmail(email)
       || this.cacheCompanyChild(await this.session.findContactByEmail(email));

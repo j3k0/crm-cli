@@ -114,6 +114,18 @@ export class InMemorySession implements DatabaseSession {
     }, [] as (Interaction & { company: string; })[]);
   }
 
+  async findInteractions(startDate: string, endDate: string): Promise<(Interaction & { company: string; })[]> {
+    return this.database.companies.reduce((arr, company) => {
+        company.interactions.forEach(i => {
+            if (i.date && i.date >= startDate && i.date <= endDate) arr.push({
+                ...i,
+                company: company.name
+            });
+        });
+        return arr;
+    }, [] as (Interaction & { company: string; })[]);
+  }
+
   async loadConfig(): Promise<Config> {
       return this.database.config;
   }
