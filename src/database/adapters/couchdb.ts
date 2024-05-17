@@ -41,7 +41,21 @@ export class CouchDBAdapter implements DatabaseAdapter {
     this.url = url;
   }
 
-  async create(initialData: Database): Promise<void> {
+  async create(initialData: Database & {update_design_document?: boolean}): Promise<void> {
+    // User only requests an update to the design document
+    if (initialData.update_design_document) {
+      try {
+        const ddocUrl = this.url + '/' + designDocument._id;
+        const existing = await axios.get(ddocUrl);
+        const rev = existing.data._rev;
+        const result = await axios.put(ddocUrl, { ...designDocument, _rev: rev });
+        console.log('design document updated', result?.data);
+      }
+      catch (err) {
+        console.error(JSON.stringify((err as any)?.response?.data, null, 2));
+      }
+      return;
+    }
     try {
       const result = await axios.put(this.url);
       console.log('couchdb database created', result?.data);
