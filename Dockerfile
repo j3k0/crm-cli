@@ -22,4 +22,4 @@ VOLUME /app/data
 
 EXPOSE 80
 
-CMD node build/crmApiServer
+CMD node --enable-source-maps build/crmApiServer
