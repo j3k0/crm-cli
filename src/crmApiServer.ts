@@ -44,8 +44,11 @@ export async function startCrmApiServer() {
       req.log = log.child({
         req_id: reqId,
       });
-      req.log.info(req.method + ' ' + req.path);
       res.setHeader('x-request-id', reqId);
+      if (Object.keys(req.query).length > 0)
+        req.log.info({ query: req.query }, req.method + ' ' + req.path);
+      else
+        req.log.info(req.method + ' ' + req.path);
       next();
     });
 
