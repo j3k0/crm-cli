@@ -1,5 +1,5 @@
 import Fuse from "fuse.js";
-import { Company, CompanyAttributes, Contact, Database, PrintableArray } from "../types";
+import { Company, Contact, Database, PrintableArray } from "../types";
 import Table from "cli-table";
 import { defaultTableOptions, fieldToText, tableToString } from "../cli/table";
 import { DatabaseSession } from "../database";
@@ -11,7 +11,7 @@ export interface ContactsResult {
   rawEmail: Contact["email"];
 }
 
-function makeContactsResult(c: Contact, company: CompanyAttributes): ContactsResult {
+function makeContactsResult(c: Contact, company: Company): ContactsResult {
   const name = `${c.firstName} ${c.lastName}`.replace(/(^ )|( $)/g, '');
   return {
       company: company.name,

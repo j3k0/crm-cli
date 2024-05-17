@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { App, Company, CompanyAttributes, Config, Contact, Database, Interaction, TemplateEmail } from './types';
+import { App, Company, Config, Contact, Database, Interaction, TemplateEmail, newCompany } from './types';
 
 /**
  * Client for the CrmApiServer
@@ -22,7 +22,7 @@ export class CrmApiClient {
     }
   }
   
-  async searchCompanies(filter: string): Promise<CompanyAttributes[] | undefined> {
+  async searchCompanies(filter: string): Promise<Company[] | undefined> {
     try {
       const response = await axios.get(`${this.baseUrl}/companies/search/${encodeURIComponent(filter)}`);
       return response.data?.rows;
@@ -32,7 +32,7 @@ export class CrmApiClient {
     }
   }
 
-  async findCompany(name: string): Promise<CompanyAttributes | undefined> {
+  async findCompany(name: string): Promise<Company | undefined> {
     try {
       const response = await axios.get(`${this.baseUrl}/companies/${encodeURIComponent(name)}`);
       return response.data;
@@ -96,11 +96,11 @@ export class CrmApiClient {
     }
   }
 
-  async updateCompany(name: string, attributes: Partial<CompanyAttributes>): Promise<Company | undefined> {
+  async updateCompany(name: string, attributes: Partial<Company>): Promise<Company | undefined> {
     try {
       const response = await axios.put(`${this.baseUrl}/companies/${encodeURIComponent(name)}`, attributes);
       if (response.data) {
-        return new Company(response.data);
+        return newCompany(response.data);
       }
     } catch (error) {
       console.error('Error updating company:', error);
@@ -112,7 +112,7 @@ export class CrmApiClient {
       return (await axios.get(`${this.baseUrl}/dump`)).data;
   }
 
-  async allCompanies(): Promise<CompanyAttributes[] | undefined> {
+  async allCompanies(): Promise<Company[] | undefined> {
     try {
       const response = await axios.get(`${this.baseUrl}/companies`);
       return response.data?.rows;
@@ -122,13 +122,13 @@ export class CrmApiClient {
     }
   }
 
-  async addCompany(companyData: CompanyAttributes): Promise<Company> {
+  async addCompany(companyData: Company): Promise<Company> {
     try {
       const response = await axios.post(`${this.baseUrl}/companies`, companyData);
       if (response.data.error) {
         throw new Error(response.data.error);
       }
-      return new Company(response.data);
+      return newCompany(response.data);
     } catch (error) {
       console.error('Error adding company:', error);
       throw error;

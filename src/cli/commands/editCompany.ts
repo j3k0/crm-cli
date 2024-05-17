@@ -1,10 +1,9 @@
 import { editJson } from "../editor";
-import { findCompany } from "../../queries/requests";
-import { Company, CompanyAttributes, Database, Printable } from "../../types";
+import { Company, Printable } from "../../types";
 import { doYouConfirm } from "../utils";
 import { DatabaseSession } from "../../database";
 
-export async function editCompany(database: DatabaseSession, filter?: string): Promise<(CompanyAttributes & Printable) | undefined> {
+export async function editCompany(database: DatabaseSession, filter?: string): Promise<(Company & Printable) | undefined> {
   if (!filter) {
       console.log('Usage: crm edit-company NAME');
       process.exit(1);

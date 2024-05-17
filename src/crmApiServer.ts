@@ -1,4 +1,4 @@
-import express from 'express';
+import express, { Request, Response, NextFunction } from 'express';
 import crypto from 'crypto';
 import bunyan from 'bunyan';
 import { connectCrmDatabase } from './database';
@@ -90,7 +90,19 @@ export async function startCrmApiServer() {
       .json({ error: 'Unauthorized' });
   });
 
-  app.post('/reset',
+  function tryCatch<T>(middleware: (req: Request, res: Response, next: NextFunction) => Promise<T>) {
+    return async function (req: Request, res: Response, next: NextFunction) {
+      try {
+        await middleware(req, res, next);
+      }
+      catch (err) {
+        req.log.warn(err);
+        next(err);
+      }
+    }
+  }
+
+  app.post('/reset', tryCatch(
     /**
      * Resets the database with the provided data.
      * 
@@ -102,8 +114,10 @@ export async function startCrmApiServer() {
      * @apiName ResetDatabase
      * @apiGroup Database
      *
-     * @apiParam {Object} requestBody Initial database structure.
-     * @apiParamExample {json} Request-Example:
+     * @apiBody {Company[]} companies Companies to import
+     * @apiBody {Config} config Initial configuration
+     * @apiBody {boolean} update_design_document Refresh couchdb's design document (CouchDB backend only)
+     * @apiExample {json} Request-Example:
      * {
      *   "companies": [
      *     {
@@ -136,7 +150,7 @@ export async function startCrmApiServer() {
      *   }
      * }
      *
-     * @apiSuccess {Object} config The configuration of the database after resetting.
+     * @apiSuccessInterface (./types.ts) {Config}
      * @apiSuccessExample {json} Success-Response:
      * {
      *   "subscriptionPlans": ["Free", "Premium"],
@@ -162,9 +176,9 @@ export async function startCrmApiServer() {
       await database.create(data);
       const session = await database.open();
       res.json(await session.loadConfig());
-    });
+    }));
 
-  app.use(
+  app.use(tryCatch(
     /**
      * Middleware function to open a database session for each request.
      * 
@@ -185,17 +199,58 @@ export async function startCrmApiServer() {
         }
       });
       next();
-    });
+    }));
 
-  app.get('/companies/search/:filter', async function getSearchCompanies(req, res) {
-    res.json({
-      rows: await req.session.searchCompanies(req.params.filter)
-    });
-  });
+  
+  /**
+   * @api {get} /companies/search/:filter Search for companies
+   * @apiName SearchCompanies
+   * @apiGroup Companies
+   * 
+   * @apiDescription Searches for companies based on a filter query.
+   * 
+   * @apiParam {String} filter The filter to apply when searching for companies (e.g., name=Acme).
+   * 
+   * @apiSuccessInterface (./types.ts) {Company[]} rows
+   * @apiSuccessExample {json} Success-Response:
+   *     HTTP/1.1 200 OK
+   *     {
+   *       "rows": [{
+   *         "id": "1",
+   *         "name": "Acme Corp",
+   *         "url": "https://acme-corp.example.com",
+   *         "contacts": [],
+   *         "apps": []
+   *       }]
+   *     }
+   * 
+   * @apiError {String} error Description of the error.
+   * @apiErrorExample {json} Error-Response:
+   *     HTTP/1.1 400 Bad Request
+   *     {
+   *       "error": "Invalid filter syntax"
+   *     }
+   */
+  app.get('/companies/search/:filter', tryCatch(
+    async function getSearchCompanies(req, res) {
+      res.json({
+        rows: await req.session.searchCompanies(req.params.filter)
+      });
+    }));
 
-  app.get('/dump', async function getDump(req, res) {
+  /**
+   * @api {get} /dump Dump the content of the database
+   * @apiName DumpDatabase
+   * @apiGroup Database
+   * 
+   * @apiDescription Dump the full content of the database
+   * 
+   * @apiSuccessInterface (./types.ts) {Config} config
+   * @apiSuccessInterface (./types.ts) {Company[]} companies
+   */
+  app.get('/dump', tryCatch(async function getDump(req, res) {
     res.json(await req.session.dump());
-  });
+  }));
 
   /**
    * Responds with the result of a CRM library operation, handling both success and error cases.
@@ -220,16 +275,49 @@ export async function startCrmApiServer() {
     }
   }
 
-  app.get('/companies', async function getAllCompanies(req, res) {
-    res.json((await req.session.dump()).companies);
-  });
+  /**
+   * @api {get} /companies
+   * Retrieves a list of companies
+   * @apiName GetCompanies
+   * @apiGroup Companies
+   * @apiSuccessInterface (./types.ts) {Company[]} body
+   * @apiSuccessExample {json} Success-Response
+   * [{
+   *   "name": "New Company Name",
+   *   "url": "https://newcompany.com",
+   *   "contacts": [
+   *     {
+   *       "email": "newcontact@example.com",
+   *       "role": "CTO"
+   *     }
+   *   ],
+   *   "apps": [
+   *     {
+   *       "appName": "New App",
+   *       "plan": "Premium",
+   *       "email": "newapp@example.com"
+   *     }
+   *   ]
+   * }]
+   */
+  app.get('/companies', tryCatch(async function getAllCompanies(req, res) {
+    res.json((await req.session.dump()).companies as Company[]);
+  }));
 
-  app.get('/companies/:name', async function getFindCompanies(req, res) {
+  /**
+   * @api {get} /companies/:name
+   * Retrieves a company by name
+   * @apiParam {string} name Name of the company
+   * @apiName GetCompany
+   * @apiGroup Companies
+   * @apiSuccessInterface (./types.ts) {Company} body
+   */
+  app.get('/companies/:name', tryCatch(async function getFindCompanies(req, res) {
     const company = await req.session.findCompanyByName(req.params.name);
     res.json(company);
-  });
+  }));
 
-  app.post('/companies',
+  app.post('/companies', tryCatch(
     /**
     * Handles the creation of a new company.
     * 
@@ -242,8 +330,8 @@ export async function startCrmApiServer() {
     * @apiName PostCompanies
     * @apiGroup Companies
     *
-    * @apiParam {Object} requestBody The company object to be created.
-    * @apiParamExample {json} Request-Example:
+    * @apiBodyInterface (./types.ts) {Company} body
+    * @apiExample {json} Request-Example:
     * {
     *   "name": "Example Company",
     *   "url": "https://example.com",
@@ -298,9 +386,9 @@ export async function startCrmApiServer() {
         error: 'Failed to add company'
       });
     }
-  });
+  }));
 
-  app.put('/companies/:name',
+  app.put('/companies/:name', tryCatch(
     /**
      * Updates an existing company with new attributes.
      * 
@@ -314,8 +402,8 @@ export async function startCrmApiServer() {
      * @apiGroup Companies
      * 
      * @apiParam {String} name The current name of the company.
-     * @apiParam {Object} requestBody The new attributes for the company.
-     * @apiParamExample {json} Request-Example:
+     * @apiBody {Object} requestBody The new attributes for the company.
+     * @apiExample {json} Request-Example:
      * {
      *   "name": "New Company Name",
      *   "url": "https://newcompany.com",
@@ -364,7 +452,7 @@ export async function startCrmApiServer() {
       const newCompany = req.body; // Assuming the request body contains the new app data
       const company = await req.session.updateCompany(name, newCompany);
       respondWithLibResult(req, res, next, company, company => ({ company }));
-    });
+    }));
 
   // GET endpoint to retrieve all interactions
   // app.get('/interactions', async function getInteractions(req, res) {
@@ -381,7 +469,7 @@ export async function startCrmApiServer() {
   // });
 
   // POST to add an interaction
-  app.post('/interactions',
+  app.post('/interactions', tryCatch(
     /**
      * Handles the creation of a new interaction.
      * 
@@ -393,8 +481,8 @@ export async function startCrmApiServer() {
      * @apiName PostInteractions
      * @apiGroup Interactions
      *
-     * @apiParam {Object} requestBody The interaction object to be created.
-     * @apiParamExample {json} Request-Example:
+     * @apiBody {Object} requestBody The interaction object to be created.
+     * @apiExample {json} Request-Example:
      * {
      *   "company": "Example Company",
      *   "summary": "Meeting with the team",
@@ -419,10 +507,10 @@ export async function startCrmApiServer() {
         return res.status(400).json({ error: '"company" missing' });
       const result = await req.session.addInteraction(newInteraction);
       respondWithLibResult(req, res, next, result, interaction => ({ interaction }));
-    });
+    }));
 
   // PUT to update an interaction
-  app.put('/interactions/:companyName/:index',
+  app.put('/interactions/:companyName/:index', tryCatch(
     /**
      * @param {express.Request} req - The Express request object.
      * @param {express.Response} res - The Express response object.
@@ -434,10 +522,10 @@ export async function startCrmApiServer() {
       const index = parseInt(req.params.index);
       const result = await req.session.updateInteraction(company, index, req.body);
       respondWithLibResult(req, res, next, result, interaction => ({ interaction }));
-    });
+    }));
 
   // POST to clear followup date for an interaction
-  app.post('/interactions/:companyName/:index/done',
+  app.post('/interactions/:companyName/:index/done', tryCatch(
     /**
      * @param {express.Request} req - The Express request object.
      * @param {express.Response} res - The Express response object.
@@ -449,9 +537,9 @@ export async function startCrmApiServer() {
       const index = parseInt(req.params.index);
       const result = await req.session.doneInteraction(company, index);
       respondWithLibResult(req, res, next, result, interaction => ({ interaction }));
-    });
+    }));
 
-  app.get('/interactions',
+  app.get('/interactions', tryCatch(
     /**
      * @param {express.Request} req - The Express request object.
      * @param {express.Response} res - The Express response object.
@@ -468,10 +556,10 @@ export async function startCrmApiServer() {
         interactions
       });
       res.end();
-    });
+    }));
 
 
-  app.get('/followups',
+  app.get('/followups', tryCatch(
     /**
      * @param {express.Request} req - The Express request object.
      * @param {express.Response} res - The Express response object.
@@ -488,7 +576,7 @@ export async function startCrmApiServer() {
         followups
       });
       res.end();
-    });
+    }));
 
 
   // GET endpoint to retrieve all contacts
@@ -506,7 +594,7 @@ export async function startCrmApiServer() {
   // });
 
   // GET endpoint to retrieve a contact by email
-  app.get('/contacts/by-email/:email',
+  app.get('/contacts/by-email/:email', tryCatch(
     async function getFindContactByEmail(req, res) {
       const result = await req.session.findContactByEmail(req.params.email);
       if (!result)
@@ -515,10 +603,10 @@ export async function startCrmApiServer() {
         ...result.contact,
         company: result.company.name
       });
-    });
+    }));
 
   // POST endpoint to create a new contact
-  app.post('/contacts',
+  app.post('/contacts', tryCatch(
     async function postContacts(req, res, next) {
       const newContact = req.body; // Assuming the request body contains the new contact data
       const company = newContact.company;
@@ -526,15 +614,15 @@ export async function startCrmApiServer() {
         return res.status(400).json({ error: '"company" missing' });
       const added = await req.session.addContact(newContact);
       respondWithLibResult(req, res, next, added, contact => ({ contact }));
-    });
+    }));
 
   // PUT endpoint to update an existing contact
-  app.put('/contacts/:email',
+  app.put('/contacts/:email', tryCatch(
     async function putContact(req, res, next) {
       const email = req.params.email;
       const result = await req.session.updateContact(email, req.body);
       respondWithLibResult(req, res, next, result, contact => ({contact}));
-    });
+    }));
 
   // DELETE endpoint to delete a contact
   // app.delete('/contacts/:id', (req, res) => {
@@ -560,7 +648,7 @@ export async function startCrmApiServer() {
   // });
 
   // GET endpoint to retrieve an app
-  app.get('/apps/by-name/:appName', async function getFindApps(req, res) {
+  app.get('/apps/by-name/:appName', tryCatch(async function getFindApps(req, res) {
     const appName = req.params.appName;
     if (!appName) {
       res.status(400).json({ error: '"appName" is missing' });
@@ -574,9 +662,9 @@ export async function startCrmApiServer() {
       ...result.app,
       company: result.company.name,
     });
-  });
+  }));
 
-  app.get('/apps/by-email/:email', async function getFindAppsByEmail(req, res) {
+  app.get('/apps/by-email/:email', tryCatch(async function getFindAppsByEmail(req, res) {
     const email = req.params.email;
     if (!email) {
       res.status(400).json({ error: '"email" is missing' });
@@ -590,9 +678,9 @@ export async function startCrmApiServer() {
       ...result.app,
       company: result.company.name,
     });
-  });
+  }));
 
-  app.post('/apps',
+  app.post('/apps', tryCatch(
     /**
      * Handles the creation of a new app.
      * 
@@ -605,8 +693,8 @@ export async function startCrmApiServer() {
      * @apiName PostApps
      * @apiGroup Apps
      *
-     * @apiParam {Object} requestBody The app object to be created.
-     * @apiParamExample {json} Request-Example:
+     * @apiBody {Object} requestBody The app object to be created.
+     * @apiExample {json} Request-Example:
      * {
      *   "company": "Example Company",
      *   "appName": "Example App",
@@ -639,10 +727,10 @@ export async function startCrmApiServer() {
       }
       const result = await req.session.addApp(newApp);
       respondWithLibResult(req, res, next, result, app => ({ app }));
-    });
+    }));
 
   // PUT to update an app
-  app.put('/apps/:appName', async function putApps(req, res) {
+  app.put('/apps/:appName', tryCatch(async function putApps(req, res) {
     const attributes = req.body;
     const added = await req.session.updateApp(req.params.appName, attributes);
     if ('error' in added) {
@@ -656,31 +744,31 @@ export async function startCrmApiServer() {
         app: added,
       });
     }
-  });
+  }));
 
-  app.put('/config', async function putConfig(req, res) {
+  app.put('/config', tryCatch(async function putConfig(req, res) {
     const attributes = req.body;
     const config = await req.session.updateConfig(attributes);
     res.json(config);
-  });
+  }));
 
-  app.get('/config', async function getConfig(req, res) {
+  app.get('/config', tryCatch(async function getConfig(req, res) {
     res.json(await req.session.loadConfig());
-  });
+  }));
 
-  app.get('/config/staff', async function getConfigStaff(req, res) {
+  app.get('/config/staff', tryCatch(async function getConfigStaff(req, res) {
     const staff = (await req.session.loadConfig()).staff;
     res.json(staff);
-  });
+  }));
 
-  app.post('/config/staff',
+  app.post('/config/staff', tryCatch(
     async function postConfigStaff(req, res, next) {
       const newStaff = req.body; // format: { "name": "User Full Name", "email": "email@domain.com" }
       const added = await req.session.addStaff(newStaff);
       respondWithLibResult(req, res, next, added, staff => ({staff}));
-    });
+    }));
 
-  app.get('/config/templates', async function getConfigTemplates(req, res) {
+  app.get('/config/templates', tryCatch(async function getConfigTemplates(req, res) {
     const templates = (await req.session.loadConfig()).templates || [];
     const filter = req.query.renderFor;
     if (filter) {
@@ -694,33 +782,33 @@ export async function startCrmApiServer() {
     else {
       res.json({templates});
     }
-  });
+  }));
 
-  app.post('/config/templates',
+  app.post('/config/templates', tryCatch(
     async function postConfigTemplates(req, res, next) {
       const newTemplate = req.body; // format: { "content": "Email Content", "subject": "Email Subject" }
       const added = await req.session.addTemplate(newTemplate);
       respondWithLibResult(req, res, next, added, template => ({template}));
-    });
+    }));
 
-  app.post('/render-template',
+  app.post('/render-template', tryCatch(
     async function postRenderTemplate(req, res, next) {
       const {template, filter} = req.body;
       const result = await renderTemplateEmailForContact(req.session, template, filter);
       res.json({template: result});
-    });
+    }));
 
-  app.get('/throw_an_exception',
+  app.get('/throw_an_exception', tryCatch(
     /** For debugging, just throw an exception */
-    function throwAnException(req, res, next) {
+    async function throwAnException(req, res, next) {
       throw new Error('Debug Throw');
-    });
+    }));
 
-  app.get('/next_an_error',
+  app.get('/next_an_error', tryCatch(
     /** For debugging, just call next with an error */
-    function throwAnException(req, res, next) {
+    async function nextAnError(req, res, next) {
       next(new Error('Debug Next Error'));
-    });
+    }));
 
   app.get('*',
     /** Catch requests to non existing endpoints */
@@ -753,9 +841,20 @@ export async function startCrmApiServer() {
       + ` - ${url}/companies\n`
     );
   });
+
+  
 }
 
 // if this script is the entrypoint, call createServer
 if (require.main === module) {
   startCrmApiServer();
+
+  process.on('uncaughtException', (err) => {
+    log.error(err, 'Uncaught Exception:');
+    // process.exit(1);
+  });
+  
+  process.on('unhandledRejection', (reason, promise) => {
+    log.error(`Unhandled Rejection at: ${promise}, reason: ${reason}`);
+  });
 }

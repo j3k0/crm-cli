@@ -1,4 +1,4 @@
-import { Company, Database, PrintableArray } from "../types";
+import { Company, Database, PrintableArray, companyEmail, hasInteraction, newCompany } from "../types";
 import Fuse from 'fuse.js';
 import moment from 'moment';
 import Table from 'cli-table';
@@ -21,14 +21,14 @@ export async function followups(database: DatabaseSession, filter: string, delCo
   let id = 1;
   const data = await database.dump();
   data.companies.forEach((companyData) => {
-      const company = new Company(companyData);
+      const company = newCompany(companyData);
       if (company.noFollowUp) return;
       // Follow-up 3 days after registration
-      if (!company.hasInteraction('registration') && !company.hasInteraction('subscription')) {
+      if (!hasInteraction(company, 'registration') && !hasInteraction(company, 'subscription')) {
           company.apps.forEach((app) => {
               out.push({
                   company: company.name,
-                  email: company.email,
+                  email: companyEmail(company),
                   tag: 'R+3d',
                   summary: '3d after registration',
                   date: moment(new Date(app.createdAt)).add(3, 'days').format()
@@ -54,7 +54,7 @@ export async function followups(database: DatabaseSession, filter: string, delCo
       company.interactions.map((i) => ({
           id: id++,
           company: company.name,
-          email: company.email,
+          email: companyEmail(company),
           tag: i.tag,
           summary: i.summary,
           date: i.followUpDate

@@ -1,5 +1,5 @@
 import { CrmApiClient, crmApiClient } from "../../crmApiClient";
-import { App, Company, CompanyAttributes, Config, Contact, Database, Interaction } from "../../types";
+import { App, Company, Config, Contact, Database, Interaction, newCompany } from "../../types";
 import { DatabaseSessionCache } from "./sessionCache";
 import { DatabaseAdapter, DatabaseSession } from "../types";
 
@@ -31,7 +31,7 @@ export class RemoteApiSession implements DatabaseSession {
     this.client = client;
   }
 
-  async addCompany(company: CompanyAttributes): Promise<Company | { error: string; }> {
+  async addCompany(company: Company): Promise<Company | { error: string; }> {
     return this.catchErrors(this.client.addCompany(company));
   }
 
@@ -71,7 +71,7 @@ export class RemoteApiSession implements DatabaseSession {
   }
 
   findCompanyByName(name: string): Promise<Company | undefined> {
-    return this.catch404(this.client.findCompany(name), async company => new Company(company));
+    return this.catch404(this.client.findCompany(name), async company => newCompany(company));
   }
 
   findContactByEmail(email: string): Promise<{ company: Company; contact: Contact; } | undefined> {
@@ -95,10 +95,10 @@ export class RemoteApiSession implements DatabaseSession {
   }
 
   async searchCompanies(filter: string): Promise<Company[]> {
-    return (await this.client.searchCompanies(filter))?.map(c => new Company(c)) || [];
+    return (await this.client.searchCompanies(filter))?.map(c => newCompany(c)) || [];
   }
 
-  updateCompany(name: string, attributes: Partial<CompanyAttributes>): Promise<Company | { error: string; }> {
+  updateCompany(name: string, attributes: Partial<Company>): Promise<Company | { error: string; }> {
     return this.catchErrors(this.client.updateCompany(name, attributes));
   }
 
@@ -112,7 +112,7 @@ export class RemoteApiSession implements DatabaseSession {
       const company = await this.client.findCompany(value?.company);
       delete (value as any)?.company;
       if (company) {
-        return new Company(company);
+        return newCompany(company);
       }
     }
     throw new Error('Company "' + (value?.company ?? '<NO VALUE>') + '" not found with');

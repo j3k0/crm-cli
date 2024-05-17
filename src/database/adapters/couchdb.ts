@@ -1,5 +1,5 @@
 import axios from "axios";
-import { App, Company, CompanyAttributes, Config, Contact, Database, Interaction } from "../../types";
+import { App, Company, Config, Contact, Database, Interaction, newCompany } from "../../types";
 import { DatabaseSessionCache } from "./sessionCache";
 import { DatabaseAdapter, DatabaseSession } from "../types";
 import { md5 } from "../../utils/md5";
@@ -103,13 +103,13 @@ export class CouchDBSession implements DatabaseSession {
     let config: Config | undefined;
     const companies: Company[] = [];
     const url = `${this.url}/_all_docs?include_docs=true`;
-    const result = await axios.get<CouchDBViewResult<CompanyAttributes | Config, { rev: string }>>(url);
+    const result = await axios.get<CouchDBViewResult<Company | Config, { rev: string }>>(url);
     for (const row of result.data.rows) {
       if (row.id === 'config') {
         config = row.doc as Config;
       }
       else if (row.id.slice(0, 7) === "company") {
-        companies.push(new Company(row.doc as CompanyAttributes));
+        companies.push(newCompany(row.doc as Company));
       }
     }
     if (!config) throw new Error('no config found, database is empty');
@@ -124,9 +124,9 @@ export class CouchDBSession implements DatabaseSession {
         include_docs: 'true'
       }).toString();
       const url = `${this.url}/_design/companies/_view/by_email?${query}`;
-      const result = await axios.get<CouchDBViewResult<CompanyAttributes, 1>>(url);
+      const result = await axios.get<CouchDBViewResult<Company, 1>>(url);
       for (const row of result.data.rows) {
-        const company = new Company(row.doc);
+        const company = newCompany(row.doc);
         const app = company.apps.find(a => a.email === email);
         if (app) return { company, app };
       }
@@ -144,9 +144,9 @@ export class CouchDBSession implements DatabaseSession {
         include_docs: 'true'
       }).toString();
       const url = `${this.url}/_design/companies/_view/by_app_name?${query}`;
-      const result = await axios.get<CouchDBViewResult<CompanyAttributes, 1>>(url);
+      const result = await axios.get<CouchDBViewResult<Company, 1>>(url);
       if (result.data.rows.length > 0) {
-        const company = new Company(result.data.rows[0].doc);
+        const company = newCompany(result.data.rows[0].doc);
         const app = company.apps.find(a => a.appName === appName);
         if (app) return { company, app };
       }
@@ -157,15 +157,16 @@ export class CouchDBSession implements DatabaseSession {
   }
 
   private async handleFindErrors(context: string, err: unknown) {
-    if (couchdbError(err) === 'not_found') {
+    const errAny = (err || {}) as any;
+    if (couchdbError(errAny) === 'not_found') {
       return undefined;
     }
-    else if (couchdbError(err) !== 'no_code') {
-      console.error(context + ' couchdb error:', (err as any)?.response?.data);
-      throw new Error((err as any).response?.data?.error?.message);
+    else if (couchdbError(errAny) !== 'no_code') {
+      console.error(context + ' couchdb error:', errAny?.response?.data);
+      throw new Error(errAny.response?.data?.error?.message);
     }
-    console.error(context + ' error:', (err as any)?.data);
-    throw new Error((err as Error).message);
+    console.error(context + ' error:', errAny?.data || errAny);
+    throw new Error((err as Error)?.message);
   }
 
   async findCompanyByName(name: string): Promise<Company | undefined> {
@@ -176,10 +177,10 @@ export class CouchDBSession implements DatabaseSession {
         include_docs: 'true'
       }).toString();
       const url = `${this.url}/_design/companies/_view/by_name?${query}`;
-      const result = await axios.get<CouchDBViewResult<CompanyAttributes, 1>>(url);
+      const result = await axios.get<CouchDBViewResult<Company, 1>>(url);
       if (result.data.rows.length > 0) {
         // console.error('findCompanyByName', result.data.rows[0]);
-        return new Company(result.data.rows[0].doc);
+        return newCompany(result.data.rows[0].doc);
       }
       else {
         return undefined;
@@ -198,9 +199,9 @@ export class CouchDBSession implements DatabaseSession {
         include_docs: 'true'
       }).toString();
       const url = `${this.url}/_design/companies/_view/by_email?${query}`;
-      const result = await axios.get<CouchDBViewResult<CompanyAttributes, 1>>(url);
+      const result = await axios.get<CouchDBViewResult<Company, 1>>(url);
       for (const row of result.data.rows) {
-        const company = new Company(row.doc);
+        const company = newCompany(row.doc);
         const contact = company.contacts.find(c => c.email === email);
         if (contact) return { company, contact };
       }
@@ -219,7 +220,7 @@ export class CouchDBSession implements DatabaseSession {
         include_docs: 'true'
       }).toString();
       const url = `${this.url}/_design/companies/_view/by_followup_date?${query}`;
-      const result = await axios.get<CouchDBViewResult<CompanyAttributes, number>>(url);
+      const result = await axios.get<CouchDBViewResult<Company, number>>(url);
       const ret: (Interaction & { company: string; })[] = [];
       for (const row of result.data.rows) {
         const company = row.doc;
@@ -246,7 +247,8 @@ export class CouchDBSession implements DatabaseSession {
         include_docs: 'true'
       }).toString();
       const url = `${this.url}/_design/companies/_view/by_interaction_date?${query}`;
-      const result = await axios.get<CouchDBViewResult<CompanyAttributes, number>>(url);
+      // console.log(url);
+      const result = await axios.get<CouchDBViewResult<Company, number>>(url);
       const ret: (Interaction & { company: string; })[] = [];
       for (const row of result.data.rows) {
         const company = row.doc;
@@ -295,11 +297,11 @@ export class CouchDBSession implements DatabaseSession {
     
   async allCompanyNames(): Promise<string[]> {
     const url = `${this.url}/_design/companies/_view/by_name`;
-    const result = await axios.get<CouchDBViewResult<CompanyAttributes, 1>>(url);
+    const result = await axios.get<CouchDBViewResult<Company, 1>>(url);
     return result.data.rows.map(row => row.key);
   }
 
-  async addCompany(company: CompanyAttributes): Promise<Company | { error: string; }> {
+  async addCompany(company: Company): Promise<Company | { error: string; }> {
     try {
       const result = await axios.post<Company & CouchDBDocument>(this.url, {
         _id: "company:" + md5(company.name || ''),
@@ -316,7 +318,7 @@ export class CouchDBSession implements DatabaseSession {
     }
   }
 
-  async updateCompany(name: string, attributes: Partial<CompanyAttributes & CouchDBDocument>): Promise<Company | { error: string; }> {
+  async updateCompany(name: string, attributes: Partial<Company & CouchDBDocument>): Promise<Company | { error: string; }> {
     try {
       const docId = attributes._id || ("company:" + md5(name || ''));
       const result = await axios.put<Company & CouchDBDocument>(`${this.url}/${docId}`, attributes);

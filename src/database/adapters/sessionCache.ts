@@ -1,4 +1,4 @@
-import { App, Company, CompanyAttributes, Config, Contact, Database } from "../../types";
+import { App, Company, Config, Contact, Database } from "../../types";
 import { emptyDatabase } from "../emptyDatabase";
 import { InMemorySession } from "./inMemory";
 import { DatabaseSession } from "../types";
@@ -32,7 +32,7 @@ export class DatabaseSessionCache implements DatabaseSession {
     this.companies = [];
   }
 
-  addCompany(company: CompanyAttributes): Promise<Company | { error: string; }> {
+  addCompany(company: Company): Promise<Company | { error: string; }> {
     this.clearCache();
     return this.session.addCompany(company);
   }
@@ -121,7 +121,7 @@ export class DatabaseSessionCache implements DatabaseSession {
     return this.session.searchCompanies(filter);
   }
 
-  async updateCompany(name: string, attributes: Partial<CompanyAttributes>): Promise<Company | { error: string; }> {
+  async updateCompany(name: string, attributes: Partial<Company>): Promise<Company | { error: string; }> {
     let company = await this.findCompanyByName(name);
     if (!company) { // this company doesn't exists
       return { error: 'company not found' };

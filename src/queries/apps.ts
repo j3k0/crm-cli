@@ -1,11 +1,11 @@
 import Table from "cli-table";
-import { App, CompanyAttributes, Database, PrintableArray } from "../types";
+import { App, Company, Database, PrintableArray } from "../types";
 import { defaultTableOptions, fieldToText, tableToString } from "../cli/table";
 import Fuse from "fuse.js";
 import { DatabaseSession } from "../database";
 
 export interface AppResult {
-    company: CompanyAttributes["name"];
+    company: Company["name"];
     created: App["createdAt"];
     upgraded: App["upgradedAt"];
     churned: App["churnedAt"];

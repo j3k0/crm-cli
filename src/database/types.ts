@@ -1,4 +1,4 @@
-import { App, Company, CompanyAttributes, Config, Contact, Database, Interaction } from "../types";
+import { App, Company, Config, Contact, Database, Interaction } from "../types";
 
 /**
  * Typically a session is associated with a single operation / request
@@ -9,8 +9,8 @@ export interface DatabaseSession {
   dump(): Promise<Database>;
   
   // companies
-  addCompany(company: CompanyAttributes): Promise<Company | {error: string}>;
-  updateCompany(name: string, attributes: Partial<CompanyAttributes>): Promise<Company | { error: string }>;
+  addCompany(company: Company): Promise<Company | {error: string}>;
+  updateCompany(name: string, attributes: Partial<Company>): Promise<Company | { error: string }>;
   
   // indices
   findCompanyByName(name: string): Promise<Company | undefined>;

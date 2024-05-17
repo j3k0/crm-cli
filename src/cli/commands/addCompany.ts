@@ -1,11 +1,11 @@
 import enquirer from 'enquirer';
-import { Company, CompanyAttributes, Database, Printable } from '../../types';
+import { Company, Printable } from '../../types';
 import { doYouConfirm } from '../utils';
 import { DatabaseSession } from '../../database';
 import Lib from '../../lib';
 
-export async function addCompany(database: DatabaseSession, filter: string | undefined, values: Partial<CompanyAttributes> = {}): Promise<(CompanyAttributes | {}) & Printable> {
-  let company: Partial<CompanyAttributes> = {
+export async function addCompany(database: DatabaseSession, filter: string | undefined, values: Partial<Company> = {}): Promise<(Company | {}) & Printable> {
+  let company: Partial<Company> = {
       ...values
   };
   console.log('');

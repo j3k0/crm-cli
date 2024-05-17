@@ -13,6 +13,9 @@ export const designDocument =
     },
     "by_followup_date": {
       "map": "function (doc) {\n  if (doc._id.slice(0, 7) !== \"company\") return;\n  if (doc.noFollowUp) return;\n  const interactions = doc.interactions || [];\n  for (let index = 0; index < interactions.length; ++index) {\n    const i = interactions[index];\n    if (i.followUpDate) emit(new Date(i.followUpDate).toISOString().slice(0, 10), index);\n  }\n}\n"
+    },
+    "by_interaction_date": {
+      "map": "function (doc) {\n  if (doc._id.slice(0, 7) !== \"company\") return;\n  const interactions = doc.interactions || [];\n  for (let index = 0; index < interactions.length; ++index) {\n    const i = interactions[index];\n    if (i.date) emit(new Date(i.date).toISOString().slice(0, 10), index);\n  }\n}"
     }
   },
   "language": "javascript"

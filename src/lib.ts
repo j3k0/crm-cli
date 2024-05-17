@@ -1,8 +1,8 @@
 import moment from "moment";
-import { DatabaseAdapter, DatabaseSession, connectCrmDatabase } from "./database";
-import { App, Company, CompanyAttributes, Config, Contact, Interaction, TemplateEmail } from "./types";
+import { DatabaseSession } from "./database";
+import { App, Company, Config, Contact, Interaction, TemplateEmail, newCompany } from "./types";
 
-export async function addCompany(database: DatabaseSession, company: Partial<CompanyAttributes>): Promise<Company | {error: string}> {
+export async function addCompany(database: DatabaseSession, company: Partial<Company>): Promise<Company | {error: string}> {
 
   if (!company.name) {
     console.error({ company }, `ERROR: incomplete data, name missing.`);
@@ -18,12 +18,12 @@ export async function addCompany(database: DatabaseSession, company: Partial<Com
   company.contacts = company.contacts || [];
   company.interactions = [];
   company.apps = company.apps || [];
-  const ret = new Company(company as CompanyAttributes);
+  const ret = newCompany(company as Company);
   await database.addCompany(ret);
   return ret;
 }
 
-export async function editCompany(database: DatabaseSession, name: string, attributes: Partial<CompanyAttributes>): Promise<Company | {error: string}> {
+export async function editCompany(database: DatabaseSession, name: string, attributes: Partial<Company>): Promise<Company | {error: string}> {
     if (!name) {
       return {error: 'missing name'};
     }
@@ -299,7 +299,7 @@ export function renderTemplateText(content: string, elements: { app?: App, conta
     if (company) {
         content = content.replace(new RegExp('{{COMPANY_AGO}}', 'g'), company.createdAt ? moment(new Date(company.createdAt)).fromNow() : '(unknown)');
         content = content.replace(new RegExp('{{COMPANY_NAME}}', 'g'), company.name);
-        content = content.replace(new RegExp('{{COMPANY_URL}}', 'g'), company.url);
+        content = content.replace(new RegExp('{{COMPANY_URL}}', 'g'), company.url || '');
         content = content.replace(new RegExp('{{COMPANY_ADDRESS}}', 'g'), company.address || '');
     }
     return content;

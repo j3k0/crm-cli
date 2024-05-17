@@ -1,12 +1,12 @@
 import Fuse from "fuse.js";
-import { Company, CompanyAttributes, Database, PrintableArray } from "../types";
+import { Company, PrintableArray } from "../types";
 import Table from "cli-table";
 import { defaultTableOptions, fieldToText, tableToString } from "../cli/table";
 import { DatabaseSession } from "../database";
 
-export async function companies(database: DatabaseSession, filter?: string, delColumns?: (keyof CompanyAttributes)[]): Promise<PrintableArray<Company>> {
+export async function companies(database: DatabaseSession, filter?: string, delColumns?: (keyof Company)[]): Promise<PrintableArray<Company>> {
   const data = await database.dump();
-  const columns: (keyof CompanyAttributes)[] = ['name', 'url', 'address'];
+  const columns: (keyof Company)[] = ['name', 'url', 'address'];
   const displayColumns = columns.filter((c) => !delColumns || delColumns.indexOf(c) < 0);
   let out = data.companies.map(x => x);
   if (filter) {

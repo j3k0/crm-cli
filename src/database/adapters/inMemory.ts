@@ -1,5 +1,5 @@
 import { companies } from "../../queries/companies";
-import { App, Company, CompanyAttributes, Config, Contact, Database, Interaction } from "../../types";
+import { App, Company, Config, Contact, Database, Interaction, newCompany } from "../../types";
 import { emptyDatabase } from "../emptyDatabase";
 import { DatabaseAdapter, DatabaseSession } from "../types";
 
@@ -44,10 +44,10 @@ export class InMemorySession implements DatabaseSession {
       return (await companies(this, filter)).content;
   }
 
-  async addCompany(companyAttributes: CompanyAttributes): Promise<Company | { error: string }> {
+  async addCompany(companyAttributes: Company): Promise<Company | { error: string }> {
       if (!this.findCompanyByName(companyAttributes.name)) {
           this.isModified = true;
-          const company = new Company(companyAttributes);
+          const company = newCompany(companyAttributes);
           this.database.companies.push(company);
           return company;
       }
@@ -56,7 +56,7 @@ export class InMemorySession implements DatabaseSession {
       }
   }
 
-  async updateCompany(name: string, attributes: Partial<CompanyAttributes>): Promise<Company | { error: string; }> {
+  async updateCompany(name: string, attributes: Partial<Company>): Promise<Company | { error: string; }> {
       const company = await this.findCompanyByName(name);
       if (!company) {
           return { error: 'company not found' };
