@@ -63,7 +63,7 @@ export class CrmApiClient {
         end_date: endDate
       }).toString();
       const response = await axios.get(`${this.baseUrl}/interactions?${query}`);
-      return response.data?.followups || [];
+      return response.data?.interactions || [];
     } catch (error) {
       console.error('Error fetching interactions:', error);
       throw error;
