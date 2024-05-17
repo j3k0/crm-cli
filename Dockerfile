@@ -9,6 +9,9 @@ COPY crm README.md tsconfig.json /app/
 COPY templates /app/templates
 COPY types /app/types
 COPY src /app/src
+# update apidoc (served under /doc)
+RUN npm run doc
+# build javascript
 RUN npm run build
 
 ENV SERVER_API_KEY=change_me

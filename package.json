@@ -9,7 +9,8 @@
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "build": "tsc"
+    "build": "tsc",
+    "doc": "apidoc -i src"
   },
   "author": "Jean-Christophe Hoelt <hoelt@fovea.cc>",
   "license": "GPL",
@@ -24,6 +25,7 @@
     "tmp": "0.0.33"
   },
   "devDependencies": {
+    "@jchoelt/apidoc-plugin-ts": "^2.3.0",
     "@types/bunyan": "^1.8.11",
     "@types/cli-table": "^0.3.4",
     "@types/express": "^4.17.21",

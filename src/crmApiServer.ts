@@ -6,7 +6,8 @@ import { emptyDatabase } from './database/emptyDatabase';
 import { randomUUID } from 'crypto';
 import { CrmSession } from './crmSession';
 import { findContactByFilter, renderTemplateEmail, renderTemplateEmailForContact } from './lib';
-import { TemplateEmail } from './types';
+import { Company, TemplateEmail } from './types';
+import path from 'path';
 
 const log = bunyan.createLogger({
   name: 'crm-server',
@@ -20,6 +21,12 @@ export async function startCrmApiServer() {
   const database = await connectCrmDatabase();
 
   app.use(express.json({ limit: '1024mb' }));
+
+  app.get('/', function healthCheck(req, res, next) {
+    res.json({ok: true}).end();
+  });
+
+  app.use('/doc', express.static(path.join(__dirname, '..', 'doc')));
 
   app.use(
     /**
@@ -41,10 +48,6 @@ export async function startCrmApiServer() {
       res.setHeader('x-request-id', reqId);
       next();
     });
-
-  app.get('/', function healthCheck(req, res, next) {
-    res.json({ok: true}).end();
-  });
 
   /**
    * Middleware function to authenticate incoming requests.
