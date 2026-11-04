@@ -1,4 +1,5 @@
-FROM node:20
+# Node 24 LTS (maintained until 2028-04), pinned by digest: bump both together.
+FROM node:24-bookworm-slim@sha256:c86ecead9e55a5210ac1727de38a4ca840bf03dcaf34dc9749addbf383b1920c
 
 WORKDIR /app
 COPY package.json package-lock.json /app/

@@ -102,7 +102,7 @@ crm init-crm
 
 Server settings:
 
-* `SERVER_API_KEY` - the API key clients must send. The server refuses to start with a key shorter than 16 characters. If unset, a random key is generated and printed at startup.
+* `SERVER_API_KEY` - the API key clients must send. The server refuses to start with a key shorter than 16 characters. If unset, a random key is generated and printed at startup: it changes on every restart, so existing clients get 401 until you set a fixed key.
 * `ALLOW_RESET=1` - allow `POST /reset` to replace the database. Disabled by default; `update_design_document` (CouchDB) is always allowed. With file storage, the previous file is kept as `<file>.before-reset-<date>.bak`.
 
 The CRM server doesn't support SSL and the API key travels in clear text: only expose it through a TLS-terminating reverse proxy, and use `https://` URLs on the client side.
@@ -116,7 +116,7 @@ You can run the server with docker.
 docker run -p 8000:80 -e SERVER_API_KEY=$(openssl rand -hex 16) --rm -it jeko/crm-server
 ```
 
-The container runs as the unprivileged `node` user (uid 1000): a data volume created by an older (root) image needs `chown -R 1000:1000` first.
+The container runs as the unprivileged `node` user (uid 1000): a data volume created by an older (root) image needs `chown -R 1000:1000` first. Otherwise the server refuses to start (`EACCES`), because it can't save.
 
 To build the image:
 

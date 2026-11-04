@@ -1,4 +1,5 @@
 import * as fs from 'fs';
+import * as path from 'path';
 import { InMemorySession } from './inMemory';
 import { Database } from '../../types';
 import { DatabaseAdapter, DatabaseSession } from '../types';
@@ -146,6 +147,20 @@ export class FileSystemAdapter implements DatabaseAdapter {
       }
       finally {
           release();
+      }
+  }
+
+  /**
+   * Throws if the data file or its directory (where backups go) isn't writable.
+   * Saves happen after the response is sent, so a failing save would lose writes silently.
+   */
+  async checkWritable(): Promise<void> {
+      await fs.promises.access(path.dirname(this.dataFullPath), fs.constants.W_OK);
+      try {
+          await fs.promises.access(this.dataFullPath, fs.constants.W_OK);
+      }
+      catch (err) {
+          if ((err as any)?.code !== 'ENOENT') throw err;
       }
   }
 

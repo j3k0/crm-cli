@@ -2,6 +2,7 @@ import express, { Request, Response, NextFunction } from 'express';
 import crypto from 'crypto';
 import bunyan from 'bunyan';
 import { connectCrmDatabase } from './database';
+import { FileSystemAdapter } from './database/adapters/filesystem';
 import { emptyDatabase } from './database/emptyDatabase';
 import { randomUUID } from 'crypto';
 import { CrmSession } from './crmSession';
@@ -66,6 +67,7 @@ export async function startCrmApiServer() {
   const { apiKey, generated: apiKeyGenerated } = resolveApiKey();
   const allowReset = process.env.ALLOW_RESET === '1';
   const database = await connectCrmDatabase();
+  if (database instanceof FileSystemAdapter) await database.checkWritable();
 
   app.disable('x-powered-by');
 

@@ -33,8 +33,14 @@ function parseOptions(options?: DatabaseConnectOptions): DatabaseConnectParsedOp
     if (typeof options !== "string") {
         return options;
     }
-    // parse the URL
-    const url = new URL(options);
+    // parse the URL (errors must not include it: it can carry credentials)
+    let url: URL;
+    try {
+        url = new URL(options);
+    }
+    catch {
+        throw new Error("invalid database URL");
+    }
     switch (url.protocol) {
         case "file:": return {
             type: "filesystem",
@@ -54,7 +60,7 @@ function parseOptions(options?: DatabaseConnectOptions): DatabaseConnectParsedOp
             url: options.replace(/^couchdb/, 'http')
         }
         default:
-            throw new Error("invalid database URL: " + options);
+            throw new Error("invalid database URL scheme: " + url.protocol);
     }
 }
 
