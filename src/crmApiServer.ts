@@ -13,14 +13,68 @@ const log = bunyan.createLogger({
   name: 'crm-server',
 });
 
+const MIN_API_KEY_LENGTH = 16;
+
+/** Default limit for JSON request bodies. */
+const BODY_LIMIT = '5mb';
+
+/** Limit for POST /reset, which carries a full database import. */
+const RESET_BODY_LIMIT = '256mb';
+
+/**
+ * Returns the API key from SERVER_API_KEY, or a random one when unset.
+ *
+ * Refuses weak keys (empty, the old Docker default "change_me", or too short).
+ */
+function resolveApiKey(): { apiKey: string; generated: boolean } {
+  const fromEnv = process.env.SERVER_API_KEY;
+  if (!fromEnv) {
+    return { apiKey: randomUUID().replace(/-/g, ''), generated: true };
+  }
+  if (fromEnv === 'change_me' || fromEnv.length < MIN_API_KEY_LENGTH) {
+    throw new Error(`SERVER_API_KEY is too weak: use at least ${MIN_API_KEY_LENGTH} random characters (and not "change_me").`);
+  }
+  return { apiKey: fromEnv, generated: false };
+}
+
+/** Constant-time string comparison (hashing first hides the length). */
+function safeEqual(a: string, b: string): boolean {
+  const ha = crypto.createHash('sha256').update(a).digest();
+  const hb = crypto.createHash('sha256').update(b).digest();
+  return crypto.timingSafeEqual(ha, hb);
+}
+
+/** JSON.parse reviver: drops keys that could alter object prototypes. */
+function dropPrototypeKeys(key: string, value: unknown) {
+  if (key === '__proto__' || key === 'constructor' || key === 'prototype')
+    return undefined;
+  return value;
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isValidDate(value: string): boolean {
+  return !isNaN(Date.parse(value));
+}
+
 export async function startCrmApiServer() {
   const app = express();
   const hostname = process.env.HOSTNAME || 'localhost';
   const port = parseInt(process.env.PORT || '3954');
-  const apiKey = process.env.SERVER_API_KEY || randomUUID().replace(/-/g, '');
+  const { apiKey, generated: apiKeyGenerated } = resolveApiKey();
+  const allowReset = process.env.ALLOW_RESET === '1';
   const database = await connectCrmDatabase();
 
-  app.use(express.json({ limit: '1024mb' }));
+  app.disable('x-powered-by');
+
+  app.use(function securityHeaders(req, res, next) {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('Referrer-Policy', 'no-referrer');
+    next();
+  });
 
   app.get('/', function healthCheck(req, res, next) {
     res.json({ok: true}).end();
@@ -31,24 +85,30 @@ export async function startCrmApiServer() {
   app.use(
     /**
      * Sets up a logger for each request using the Bunyan logging library.
-     * It assigns a unique request ID to each request, either from the 'x-request-id' header
-     * or by generating a new UUID. The logger is then attached to the request object
-     * for use in subsequent middleware or route handlers. Additionally, it logs the
-     * request method and path at the INFO level and sets the 'x-request-id' header
-     * in the response to match the request's ID.
+     * It assigns a unique request ID to each request, either from a well-formed 'x-request-id'
+     * header or by generating a new UUID. The logger is then attached to the request object
+     * for use in subsequent middleware or route handlers. When the response is sent, it logs
+     * the method, the route pattern (not the actual path, which can contain emails or names),
+     * the query parameter names (not their values), the status and the duration.
      */
     function setupLogger(req, res, next) {
-      let reqId = req.headers['x-request-id'] || crypto.randomUUID().toLowerCase();
+      let reqId = req.headers['x-request-id'];
       if (Array.isArray(reqId)) reqId = reqId[0];
+      if (!reqId || !/^[\w.-]{1,128}$/.test(reqId)) reqId = crypto.randomUUID().toLowerCase();
       req.reqId = reqId;
       req.log = log.child({
         req_id: reqId,
       });
       res.setHeader('x-request-id', reqId);
-      if (Object.keys(req.query).length > 0)
-        req.log.info({ query: req.query }, req.method + ' ' + req.path);
-      else
-        req.log.info(req.method + ' ' + req.path);
+      const start = Date.now();
+      res.on('finish', function logRequest() {
+        const route = req.route ? req.baseUrl + req.route.path : '(unmatched)';
+        req.log.info({
+          status: res.statusCode,
+          ms: Date.now() - start,
+          query_keys: Object.keys(req.query),
+        }, req.method + ' ' + route);
+      });
       next();
     });
 
@@ -69,7 +129,7 @@ export async function startCrmApiServer() {
   app.use(async function authenticateRequest(req, res, next) {
     const authHeader = req.headers.authorization;
 
-    if (authHeader && authHeader === apiKey) {
+    if (authHeader && safeEqual(authHeader, apiKey)) {
       // authHeader set to the api key
       return next();
     }
@@ -82,8 +142,10 @@ export async function startCrmApiServer() {
       // Split the decoded string into username and password
       const [username, password] = credentials.split(':', 2);
 
-      // Continue with your authentication logic here
-      if (username === apiKey || password === apiKey) {
+      // Evaluate both comparisons (no short-circuit) to keep timing constant
+      const usernameMatches = safeEqual(username ?? '', apiKey);
+      const passwordMatches = safeEqual(password ?? '', apiKey);
+      if (usernameMatches || passwordMatches) {
         return next();
       }
     }
@@ -91,6 +153,28 @@ export async function startCrmApiServer() {
       .header('WWW-Authenticate', `Basic realm="CRM Server"`)
       .status(401)
       .json({ error: 'Unauthorized' });
+  });
+
+  // Body parsing happens after authentication, so anonymous clients can't make
+  // the server buffer large bodies. Only /reset accepts large ones.
+  const parseJson = express.json({ limit: BODY_LIMIT, reviver: dropPrototypeKeys });
+  const parseLargeJson = express.json({ limit: RESET_BODY_LIMIT, reviver: dropPrototypeKeys });
+  app.use(function parseBody(req, res, next) {
+    if (req.path === '/reset') parseLargeJson(req, res, next);
+    else parseJson(req, res, next);
+  });
+
+  app.use(function validateBody(req, res, next) {
+    if (req.method !== 'POST' && req.method !== 'PUT') return next();
+    if (!isPlainObject(req.body)) {
+      return res.status(400).json({ error: 'request body must be a JSON object' });
+    }
+    // Top-level fields starting with "_" are reserved by CouchDB (_id, _rev, _deleted...).
+    // Clients must not be able to set them.
+    for (const key of Object.keys(req.body)) {
+      if (key.startsWith('_')) delete req.body[key];
+    }
+    next();
   });
 
   function tryCatch<T>(middleware: (req: Request, res: Response, next: NextFunction) => Promise<T>) {
@@ -170,15 +254,25 @@ export async function startCrmApiServer() {
      *
      * @apiExample {curl} Example usage:
      *     curl -X POST -H "Content-Type: application/json" -d @requestBody.json http://localhost:3954/reset
+     *
+     * @apiError (403) {String} error Reset is disabled. Only `update_design_document` is allowed unless the server runs with `ALLOW_RESET=1`.
      */
     async function postReset(req, res) {
+      if (!allowReset && req.body.update_design_document !== true) {
+        return res.status(403).json({ error: 'database reset is disabled on this server (ALLOW_RESET=1 enables it)' });
+      }
       const data = {
         ...emptyDatabase(),
         ...req.body
       };
       await database.create(data);
       const session = await database.open();
-      res.json(await session.loadConfig());
+      try {
+        res.json(await session.loadConfig());
+      }
+      finally {
+        await session.close();
+      }
     }));
 
   app.use(tryCatch(
@@ -195,8 +289,8 @@ export async function startCrmApiServer() {
      */
     async function openDatabaseSession(req, res, next) {
       req.session = new CrmSession(database);
-      // Close database session
-      res.on('finish', async function closeDatabaseSessionOnFinish() {
+      // Close database session ('close' also fires when the client aborts)
+      res.on('close', async function closeDatabaseSessionOnClose() {
         if (req.session) {
           await req.session.close();
         }
@@ -271,7 +365,8 @@ export async function startCrmApiServer() {
    */
   function respondWithLibResult<T extends object, U>(req: express.Request, res: express.Response, next: express.NextFunction, value: T | { error: string }, format: (t: T) => U) {
     if ('error' in value) {
-      next(value.error);
+      // Library errors are user-facing messages ("company not found"...), safe to return.
+      res.status(400).json({ error: value.error });
     }
     else {
       res.json(format(value));
@@ -522,6 +617,8 @@ export async function startCrmApiServer() {
      */
     async function updateInteractionMiddleware(req, res, next) {
       const company = req.params.companyName;
+      if (!/^\d+$/.test(req.params.index))
+        return res.status(400).json({ error: 'invalid interaction index' });
       const index = parseInt(req.params.index);
       const result = await req.session.updateInteraction(company, index, req.body);
       respondWithLibResult(req, res, next, result, interaction => ({ interaction }));
@@ -537,6 +634,8 @@ export async function startCrmApiServer() {
      */
     async function doneInteractionMiddleware(req, res, next) {
       const company = req.params.companyName;
+      if (!/^\d+$/.test(req.params.index))
+        return res.status(400).json({ error: 'invalid interaction index' });
       const index = parseInt(req.params.index);
       const result = await req.session.doneInteraction(company, index);
       respondWithLibResult(req, res, next, result, interaction => ({ interaction }));
@@ -553,6 +652,9 @@ export async function startCrmApiServer() {
       const endDate = req.query.end_date ? '' + req.query.end_date : undefined;
       if (!startDate || !endDate) {
         return res.status(400).json({ error: 'start_date and end_date are required' });
+      }
+      if (!isValidDate(startDate) || !isValidDate(endDate)) {
+        return res.status(400).json({ error: 'start_date and end_date must be valid dates' });
       }
       const interactions = await req.session.findInteractions(startDate, endDate);
       res.json({
@@ -573,6 +675,9 @@ export async function startCrmApiServer() {
       const endDate = req.query.end_date ? '' + req.query.end_date : undefined;
       if (!startDate || !endDate) {
         return res.status(400).json({ error: 'start_date and end_date are required' });
+      }
+      if (!isValidDate(startDate) || !isValidDate(endDate)) {
+        return res.status(400).json({ error: 'start_date and end_date must be valid dates' });
       }
       const followups = await req.session.findFollowups(startDate, endDate);
       res.json({
@@ -613,7 +718,7 @@ export async function startCrmApiServer() {
     async function postContacts(req, res, next) {
       const newContact = req.body; // Assuming the request body contains the new contact data
       const company = newContact.company;
-      if (!company)
+      if (!company || typeof company !== 'string')
         return res.status(400).json({ error: '"company" missing' });
       const added = await req.session.addContact(newContact);
       respondWithLibResult(req, res, next, added, contact => ({ contact }));
@@ -725,7 +830,7 @@ export async function startCrmApiServer() {
     async function postApps(req, res, next) {
       const newApp = req.body;
       const company = newApp.company;
-      if (!company) {
+      if (!company || typeof company !== 'string') {
         return res.status(400).json({ error: '"company" missing' });
       }
       const result = await req.session.addApp(newApp);
@@ -774,6 +879,9 @@ export async function startCrmApiServer() {
   app.get('/config/templates', tryCatch(async function getConfigTemplates(req, res) {
     const templates = (await req.session.loadConfig()).templates || [];
     const filter = req.query.renderFor;
+    if (filter !== undefined && typeof filter !== 'string') {
+      return res.status(400).json({ error: '"renderFor" must be a string' });
+    }
     if (filter) {
       const elements = await findContactByFilter(req.session, '' + filter);
       const rendered: TemplateEmail[] = [];
@@ -797,20 +905,11 @@ export async function startCrmApiServer() {
   app.post('/render-template', tryCatch(
     async function postRenderTemplate(req, res, next) {
       const {template, filter} = req.body;
-      const result = await renderTemplateEmailForContact(req.session, template, filter);
+      if (!isPlainObject(template) || typeof template.subject !== 'string' || typeof template.content !== 'string' || typeof filter !== 'string') {
+        return res.status(400).json({ error: '"template" ({subject, content}) and "filter" are required' });
+      }
+      const result = await renderTemplateEmailForContact(req.session, filter, { subject: template.subject, content: template.content });
       res.json({template: result});
-    }));
-
-  app.get('/throw_an_exception', tryCatch(
-    /** For debugging, just throw an exception */
-    async function throwAnException(req, res, next) {
-      throw new Error('Debug Throw');
-    }));
-
-  app.get('/next_an_error', tryCatch(
-    /** For debugging, just call next with an error */
-    async function nextAnError(req, res, next) {
-      next(new Error('Debug Next Error'));
     }));
 
   app.get('*',
@@ -823,26 +922,37 @@ export async function startCrmApiServer() {
     /**
      * Middleware function to handle errors in the application.
      * 
-     * This function logs the error and sends a response with a 500 status code and the error message.
-     * It also calls the next middleware in the stack to ensure proper error handling flow.
+     * This function logs the error. Client errors flagged as safe to expose (e.g. malformed or
+     * too large JSON bodies) are returned with their status and message. Anything else gets a
+     * generic 500 response with the request ID, so internals (database URLs, stack details)
+     * never reach the client.
      */ 
-    function handleErrors(err: Error, req: express.Request, res: express.Response, next: express.NextFunction): void {
+    function handleErrors(err: any, req: express.Request, res: express.Response, next: express.NextFunction): void {
       req.log.warn(err);
       if (res.headersSent) {
         return next(err)
       }
-      res.status(500).json({ error: err?.message, error_name: err?.name });
+      if (err?.expose && typeof err.status === 'number' && err.status >= 400 && err.status < 500) {
+        res.status(err.status).json({ error: err.message });
+        return;
+      }
+      res.status(500).json({ error: 'internal server error', request_id: req.reqId });
     });
 
   // Start the server
   app.listen(port, hostname, () => {
-    const url = `http://admin:${apiKey}@${hostname}:${port}`;
-    console.log(`CRM API server running at ${url});\n`
-      + `\n`
-      + `Test some endpoints:\n`
-      + ` - ${url}/config\n`
-      + ` - ${url}/companies\n`
-    );
+    const url = `http://${hostname}:${port}`;
+    console.log(`CRM API server running at ${url}`);
+    if (apiKeyGenerated) {
+      // Only a generated key is printed: it's the only way to learn it.
+      console.log(`SERVER_API_KEY is not set, using a random key for this run: ${apiKey}\n`
+        + `Test some endpoints (user "admin", password = the key):\n`
+        + ` - ${url}/config\n`
+        + ` - ${url}/companies\n`);
+    }
+    if (allowReset) {
+      console.log('ALLOW_RESET=1: POST /reset can overwrite the database.');
+    }
   });
 
   
@@ -850,7 +960,10 @@ export async function startCrmApiServer() {
 
 // if this script is the entrypoint, call createServer
 if (require.main === module) {
-  startCrmApiServer();
+  startCrmApiServer().catch(err => {
+    log.error(err, 'Failed to start the CRM API server');
+    process.exit(1);
+  });
 
   process.on('uncaughtException', (err) => {
     log.error(err, 'Uncaught Exception:');
