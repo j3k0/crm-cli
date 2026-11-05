@@ -12,7 +12,8 @@ export class InMemoryAdapter implements DatabaseAdapter {
     this.database = database;
   }
 
-  async create(initialData: Database): Promise<void> {
+  async create(initialData: Database & { update_design_document?: boolean }): Promise<void> {
+    if (initialData.update_design_document) return; // CouchDB only
     this.database = emptyDatabase();
   }
 

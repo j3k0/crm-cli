@@ -5,7 +5,7 @@ import { App, Company, Config, Contact, Interaction, TemplateEmail, newCompany }
 export async function addCompany(database: DatabaseSession, company: Partial<Company>): Promise<Company | {error: string}> {
 
   if (!company.name) {
-    console.error({ company }, `ERROR: incomplete data, name missing.`);
+    console.error(`ERROR: incomplete data, name missing.`);
     return {error: 'name is missing'};
   }
   const found = await database.findCompanyByName(company.name);
@@ -276,31 +276,40 @@ export async function editConfig(database: DatabaseSession, attributes: Partial<
  *  - {{COMPANY_URL}} ........ Company's URL
  *  - {{COMPANY_ADDRESS}} .... Company's website
  */
+/**
+ * Replaces every occurrence of a tag with a value.
+ *
+ * Unlike String.replace with a string, "$&", "$1"... in the value are kept as-is.
+ */
+function replaceTag(content: string, tag: string, value: string): string {
+    return content.split(tag).join(String(value));
+}
+
 export function renderTemplateText(content: string, elements: { app?: App, contact?: Contact, company?: Company }): string {
     const { app, contact, company } = elements;
     if (contact) {
         const defaultName = company?.name || app?.appName || 'user';
         const friendlyName = contact.firstName || defaultName;
         const name = `${contact.firstName} ${contact.lastName}`.replace(/(^ )|( $)/g, '') || defaultName;
-        content = content.replace(new RegExp('{{EMAIL}}', 'g'), `${contact.email}`);
-        content = content.replace(new RegExp('{{FULL_EMAIL}}', 'g'), `"${name}" <${contact.email}>`);
-        content = content.replace(new RegExp('{{FULL_NAME}}', 'g'), name);
-        content = content.replace(new RegExp('{{NAME}}', 'g'), name);
-        content = content.replace(new RegExp('{{FRIENDLY_NAME}}', 'g'), friendlyName);
-        content = content.replace(new RegExp('{{FIRST_NAME}}', 'g'), contact.firstName || '');
-        content = content.replace(new RegExp('{{LAST_NAME}}', 'g'), contact.lastName || '');
+        content = replaceTag(content, '{{EMAIL}}', `${contact.email}`);
+        content = replaceTag(content, '{{FULL_EMAIL}}', `"${name}" <${contact.email}>`);
+        content = replaceTag(content, '{{FULL_NAME}}', name);
+        content = replaceTag(content, '{{NAME}}', name);
+        content = replaceTag(content, '{{FRIENDLY_NAME}}', friendlyName);
+        content = replaceTag(content, '{{FIRST_NAME}}', contact.firstName || '');
+        content = replaceTag(content, '{{LAST_NAME}}', contact.lastName || '');
     }
     if (app) {
-        content = content.replace(new RegExp('{{APP_NAME}}', 'g'), app.appName);
-        content = content.replace(new RegExp('{{APP_PLAN}}', 'g'), app.plan);
-        content = content.replace(new RegExp('{{REGISTRATION_AGO}}', 'g'), moment(new Date(app.createdAt)).fromNow());
-        content = content.replace(new RegExp('{{SUBSCRIPTION_AGO}}', 'g'), app.upgradedAt ? moment(new Date(app.upgradedAt)).fromNow() : '(never upgraded)');
+        content = replaceTag(content, '{{APP_NAME}}', app.appName);
+        content = replaceTag(content, '{{APP_PLAN}}', app.plan);
+        content = replaceTag(content, '{{REGISTRATION_AGO}}', moment(new Date(app.createdAt)).fromNow());
+        content = replaceTag(content, '{{SUBSCRIPTION_AGO}}', app.upgradedAt ? moment(new Date(app.upgradedAt)).fromNow() : '(never upgraded)');
     }
     if (company) {
-        content = content.replace(new RegExp('{{COMPANY_AGO}}', 'g'), company.createdAt ? moment(new Date(company.createdAt)).fromNow() : '(unknown)');
-        content = content.replace(new RegExp('{{COMPANY_NAME}}', 'g'), company.name);
-        content = content.replace(new RegExp('{{COMPANY_URL}}', 'g'), company.url || '');
-        content = content.replace(new RegExp('{{COMPANY_ADDRESS}}', 'g'), company.address || '');
+        content = replaceTag(content, '{{COMPANY_AGO}}', company.createdAt ? moment(new Date(company.createdAt)).fromNow() : '(unknown)');
+        content = replaceTag(content, '{{COMPANY_NAME}}', company.name);
+        content = replaceTag(content, '{{COMPANY_URL}}', company.url || '');
+        content = replaceTag(content, '{{COMPANY_ADDRESS}}', company.address || '');
     }
     return content;
 }

@@ -85,22 +85,28 @@ CRM cli also features a client server architecture.
 You can launch a server:
 
 ```sh
-export SERVER_API_KEY=myapikey
+export SERVER_API_KEY=$(openssl rand -hex 16) # at least 16 characters
 export HOSTNAME=127.0.0.1 # that's the default
 export PORT=3000
 export DATABASE_URL=file://database.json
+export ALLOW_RESET=1 # only needed for "crm init-crm" (POST /reset)
 crm server
 ```
 
 Then connect the CRM client to the server:
 
 ```sh
-export DATABASE_URL=http://myapikey@127.0.0.1:3000
+export DATABASE_URL=http://$SERVER_API_KEY@127.0.0.1:3000
 # reset the database, or do whatever
 crm init-crm
 ```
 
-Notice that the CRM server doesn't support SSL, so it's strongly recommended you only expose it through a reverse proxy.
+Server settings:
+
+* `SERVER_API_KEY` - the API key clients must send. The server refuses to start with a key shorter than 16 characters. If unset, a random key is generated and printed at startup: it changes on every restart, so existing clients get 401 until you set a fixed key.
+* `ALLOW_RESET=1` - allow `POST /reset` to replace the database. Disabled by default; `update_design_document` (CouchDB) is always allowed. With file storage, the previous file is kept as `<file>.before-reset-<date>.bak`.
+
+The CRM server doesn't support SSL and the API key travels in clear text: only expose it through a TLS-terminating reverse proxy, and use `https://` URLs on the client side.
 
 ### Environment files
 
@@ -134,8 +140,10 @@ Notes:
 You can run the server with docker.
 
 ```sh
-docker run -p 8000:80 --rm -it jeko/crm-server
+docker run -p 8000:80 -e SERVER_API_KEY=$(openssl rand -hex 16) --rm -it jeko/crm-server
 ```
+
+The container runs as the unprivileged `node` user (uid 1000): a data volume created by an older (root) image needs `chown -R 1000:1000` first. Otherwise the server refuses to start (`EACCES`), because it can't save.
 
 To build the image:
 

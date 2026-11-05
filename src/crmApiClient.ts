@@ -2,6 +2,18 @@ import axios from 'axios';
 import { App, Company, Config, Contact, Database, Interaction, TemplateEmail, newCompany } from './types';
 
 /**
+ * Short description of a request error.
+ *
+ * Axios errors carry the request config (URL with the API key, Authorization header):
+ * never log them as-is.
+ */
+function describeError(error: unknown): string {
+  const err = error as any;
+  const serverError = err?.response?.data?.error;
+  return (err?.message ?? String(error)) + (serverError ? ` (${serverError})` : '');
+}
+
+/**
  * Client for the CrmApiServer
  */
 export class CrmApiClient {
@@ -17,7 +29,7 @@ export class CrmApiClient {
       return response.data;
     }
     catch (error) {
-      console.error('Error resetting database:', error);
+      console.error('Error resetting database:', describeError(error));
       throw error;
     }
   }
@@ -27,7 +39,7 @@ export class CrmApiClient {
       const response = await axios.get(`${this.baseUrl}/companies/search/${encodeURIComponent(filter)}`);
       return response.data?.rows;
     } catch (error) {
-      console.error('Error fetching companies:', error);
+      console.error('Error fetching companies:', describeError(error));
       throw error;
     }
   }
@@ -37,7 +49,7 @@ export class CrmApiClient {
       const response = await axios.get(`${this.baseUrl}/companies/${encodeURIComponent(name)}`);
       return response.data;
     } catch (error) {
-      console.error('Error fetching company:', error);
+      console.error('Error fetching company:', describeError(error));
       throw error;
     }
   }
@@ -51,7 +63,7 @@ export class CrmApiClient {
       const response = await axios.get(`${this.baseUrl}/followups?${query}`);
       return response.data?.followups || [];
     } catch (error) {
-      console.error('Error fetching followups:', error);
+      console.error('Error fetching followups:', describeError(error));
       throw error;
     }
   }
@@ -65,7 +77,7 @@ export class CrmApiClient {
       const response = await axios.get(`${this.baseUrl}/interactions?${query}`);
       return response.data?.interactions || [];
     } catch (error) {
-      console.error('Error fetching interactions:', error);
+      console.error('Error fetching interactions:', describeError(error));
       throw error;
     }
   }
@@ -78,7 +90,7 @@ export class CrmApiClient {
       }
       else return {error: 'interaction not updated'};
     } catch (error) {
-      console.error('Error in update interaction:', error);
+      console.error('Error in update interaction:', describeError(error));
       throw error;
     }
   }
@@ -91,7 +103,7 @@ export class CrmApiClient {
       }
       else return {error: 'interaction not done'};
     } catch (error) {
-      console.error('Error in done interaction:', error);
+      console.error('Error in done interaction:', describeError(error));
       throw error;
     }
   }
@@ -103,7 +115,7 @@ export class CrmApiClient {
         return newCompany(response.data);
       }
     } catch (error) {
-      console.error('Error updating company:', error);
+      console.error('Error updating company:', describeError(error));
       throw error;
     }
   }
@@ -117,7 +129,7 @@ export class CrmApiClient {
       const response = await axios.get(`${this.baseUrl}/companies`);
       return response.data?.rows;
     } catch (error) {
-      console.error('Error fetching companies:', error);
+      console.error('Error fetching companies:', describeError(error));
       throw error;
     }
   }
@@ -130,7 +142,7 @@ export class CrmApiClient {
       }
       return newCompany(response.data);
     } catch (error) {
-      console.error('Error adding company:', error);
+      console.error('Error adding company:', describeError(error));
       throw error;
     }
   }
@@ -140,7 +152,7 @@ export class CrmApiClient {
       const response = await axios.put(`${this.baseUrl}/contacts/${encodeURIComponent(email)}`, contactData);
       return response.data;
     } catch (error) {
-      console.error('Error updating contact:', error);
+      console.error('Error updating contact:', describeError(error));
       throw error;
     }
   }
@@ -150,7 +162,7 @@ export class CrmApiClient {
       const response = await axios.post(`${this.baseUrl}/interactions`, interaction);
       return response.data?.interaction;
     } catch (error) {
-      console.error('Error adding interaction:', error);
+      console.error('Error adding interaction:', describeError(error));
       throw error;
     }
   }
@@ -160,7 +172,7 @@ export class CrmApiClient {
       const response = await axios.post(`${this.baseUrl}/contacts`, contactData);
       return response.data;
     } catch (error) {
-      console.error('Error adding contact:', error);
+      console.error('Error adding contact:', describeError(error));
       throw error;
     }
   }
@@ -170,7 +182,7 @@ export class CrmApiClient {
       const response = await axios.post(`${this.baseUrl}/apps`, appData);
       return response.data;
     } catch (error) {
-      console.error('Error adding app:', error);
+      console.error('Error adding app:', describeError(error));
       throw error;
     }
   }
@@ -180,7 +192,7 @@ export class CrmApiClient {
       const response = await axios.put(`${this.baseUrl}/apps/${encodeURIComponent(appName)}`, attributes);
       return response.data;
     } catch (error) {
-      console.error('Error updating app:', error);
+      console.error('Error updating app:', describeError(error));
       throw error;
     }
   }
@@ -202,7 +214,7 @@ export class CrmApiClient {
   //     const response = await axios.get(`${this.baseUrl}/apps/search/${encodeURIComponent(filter)}`);
   //     return response.data?.rows;
   //   } catch (error) {
-  //     console.error('Error fetching apps:', error);
+  //     console.error('Error fetching apps:', describeError(error));
   //     throw error;
   //   }
   // }
@@ -212,7 +224,7 @@ export class CrmApiClient {
       const response = await axios.get(`${this.baseUrl}/config`);
       return response.data;
     } catch (error) {
-      console.error('Error fetching config:', error);
+      console.error('Error fetching config:', describeError(error));
       throw error;
     }
   }
@@ -222,7 +234,7 @@ export class CrmApiClient {
       const response = await axios.put(`${this.baseUrl}/config`, attributes);
       return response.data;
     } catch (error) {
-      console.error('Error updating config apps:', error);
+      console.error('Error updating config apps:', describeError(error));
       throw error;
     }
   }
@@ -237,7 +249,7 @@ export class CrmApiClient {
       const response = await axios.get(`${this.baseUrl}/config/templates${renderFor ? '?renderFor=' + encodeURIComponent(renderFor) : ''}`);
       return response.data;
     } catch (error) {
-      console.error('Error fetching templates:', error);
+      console.error('Error fetching templates:', describeError(error));
       throw error;
     }
   }
@@ -250,7 +262,7 @@ export class CrmApiClient {
       }
       return response.data.template;
     } catch (error) {
-      console.error('Error updating config apps:', error);
+      console.error('Error updating config apps:', describeError(error));
       throw error;
     }
   }
@@ -266,7 +278,7 @@ export class CrmApiClient {
       }
       return response.data.template;
     } catch (error) {
-      console.error('Error updating config apps:', error);
+      console.error('Error updating config apps:', describeError(error));
       throw error;
     }
   }

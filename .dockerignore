@@ -1,0 +1,8 @@
+.git
+node_modules
+build
+doc
+.env*
+*.bak
+crm.json
+data

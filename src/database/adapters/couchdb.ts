@@ -30,6 +30,23 @@ interface CouchDBViewResult<DocType, ValueType> {
   }[];
 }
 
+/**
+ * Copy of a document without CouchDB's reserved top-level fields (_id, _rev, _deleted...),
+ * so data coming from users can't choose which document gets written.
+ */
+function withoutReservedFields<T extends object>(doc: T): T {
+  const ret: any = {};
+  for (const [key, value] of Object.entries(doc)) {
+    if (!key.startsWith('_')) ret[key] = value;
+  }
+  return ret;
+}
+
+/** Company documents live under "company:<md5>" ids; nothing else may be written through company updates. */
+function isCompanyDocId(id: string): boolean {
+  return /^company:[^/?#%\s]+$/.test(id);
+}
+
 function couchdbError(err: any): CouchDBErrorCode {
   return (err as any)?.response?.data?.error || 'no_code';
 }
@@ -78,8 +95,8 @@ export class CouchDBAdapter implements DatabaseAdapter {
     }
     try {
       const result = await axios.post(this.url, {
+        ...withoutReservedFields(initialData.config),
         _id: "config",
-        ...initialData.config,
       });
       console.log('config created', result?.data);
     }
@@ -89,10 +106,10 @@ export class CouchDBAdapter implements DatabaseAdapter {
     for (const company of initialData.companies) {
       try {
         const result = await axios.post(this.url, {
+          ...withoutReservedFields(company),
           _id: "company:" + md5(company.name), // somehow limit risks of double insertions
-          ...company,
         });
-        console.log('company ' + company.name + ' created', result?.data);
+        console.log('company created', result?.data?.id);
       }
       catch (err) {
         console.error(JSON.stringify((err as any)?.response?.data, null, 2));
@@ -179,7 +196,8 @@ export class CouchDBSession implements DatabaseSession {
       console.error(context + ' couchdb error:', errAny?.response?.data);
       throw new Error(errAny.response?.data?.error?.message);
     }
-    console.error(context + ' error:', errAny?.data || errAny);
+    // Don't log the raw error: axios errors carry the request config (URL with credentials, headers).
+    console.error(context + ' error:', errAny?.message);
     throw new Error((err as Error)?.message);
   }
 
@@ -287,7 +305,11 @@ export class CouchDBSession implements DatabaseSession {
   }
 
   async updateConfig(attributes: Partial<Config>): Promise<Config | { error: string; }> {
-    const result = await axios.put<CouchDBDocument & Config>(`${this.url}/config`, attributes);
+    const { _rev } = attributes as Partial<CouchDBDocument>;
+    const result = await axios.put<CouchDBDocument & Config>(`${this.url}/config`, {
+      ...withoutReservedFields(attributes),
+      ...(_rev !== undefined ? { _rev } : {}),
+    });
     return result.data;
   }
 
@@ -318,10 +340,10 @@ export class CouchDBSession implements DatabaseSession {
   async addCompany(company: Company): Promise<Company | { error: string; }> {
     try {
       const result = await axios.post<Company & CouchDBDocument>(this.url, {
+        ...withoutReservedFields(company),
         _id: "company:" + md5(company.name || ''),
-        ...company
       });
-      console.log('company ' + company.name + ' added', result.data);
+      console.log('company added', (result.data as any)?.id);
       return result.data;
     }
     catch (err) {
@@ -335,8 +357,16 @@ export class CouchDBSession implements DatabaseSession {
   async updateCompany(name: string, attributes: Partial<Company & CouchDBDocument>): Promise<Company | { error: string; }> {
     try {
       const docId = attributes._id || ("company:" + md5(name || ''));
-      const result = await axios.put<Company & CouchDBDocument>(`${this.url}/${docId}`, attributes);
-      console.log('company ' + attributes.name + ' updated', result.data);
+      if (!isCompanyDocId(docId)) {
+        return { error: 'invalid company document id' };
+      }
+      const { _id, _rev } = attributes;
+      const result = await axios.put<Company & CouchDBDocument>(`${this.url}/${docId}`, {
+        ...withoutReservedFields(attributes),
+        ...(_id !== undefined ? { _id } : {}),
+        ...(_rev !== undefined ? { _rev } : {}),
+      });
+      console.log('company updated', (result.data as any)?.id);
       return result.data;
     }
     catch (err) {
