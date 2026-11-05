@@ -104,24 +104,24 @@ Notice that the CRM server doesn't support SSL, so it's strongly recommended you
 
 ### Environment files
 
-Instead of exporting variables, put them in `~/.config/crm-cli/default.env` (or `$XDG_CONFIG_HOME/crm-cli/default.env`). It is loaded automatically:
+Instead of exporting variables, put them in `~/.config/crm-cli/NAME.env` (or `$XDG_CONFIG_HOME/crm-cli/NAME.env`) and select it with `--environment NAME`. There is no default environment: if env files exist and `DATABASE_URL` isn't set, `crm` lists them and exits.
 
 ```sh
-# ~/.config/crm-cli/default.env
+# ~/.config/crm-cli/local.env
 DATABASE_URL=http://myapikey@127.0.0.1:3000
 ```
 
-Use `--environment` to load another file, either by name or by path:
+Select a file by name or by path:
 
 ```sh
-crm --environment prod companies                 # ~/.config/crm-cli/prod.env
+crm --environment local companies                # ~/.config/crm-cli/local.env
 crm --environment ./envs/staging.env companies   # a value containing "/" or ending in ".env" is a path
 ```
 
 Notes:
 
  * Real environment variables take precedence over the file (`DATABASE_URL=memory:// crm companies` still works).
- * A missing `default.env` is ignored; a missing file given with `--environment` is an error.
+ * A missing file given with `--environment` is an error.
  * Format: `KEY=value` lines, `#` comment lines, optional `export ` prefix and quotes. No inline comments, no `$VAR` expansion.
  * Relative paths inside values (`file://crm.json`) are resolved from the current directory, not from the env file.
  * The file may contain secrets (API key, passwords): `chmod 600` it.

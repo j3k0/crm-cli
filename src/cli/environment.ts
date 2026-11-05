@@ -57,17 +57,27 @@ export function extractEnvironmentFlag(argv: string[]): string | undefined {
     return undefined;
 }
 
+/** Names of the env files available in the config directory. */
+export function listEnvironments(): string[] {
+    try {
+        return fs.readdirSync(configDir())
+            .filter((f) => f.endsWith('.env'))
+            .map((f) => f.slice(0, -4))
+            .sort();
+    } catch (e) {
+        return [];
+    }
+}
+
 /**
  * Load an env file into process.env. Existing environment variables win.
- * A missing "default" file is ignored; any other missing file is an error.
- * @returns the path of the loaded file, if any.
+ * A missing file is an error.
+ * @returns the path of the loaded file.
  */
-export function loadEnvironment(arg: string = 'default'): string | undefined {
+export function loadEnvironment(arg: string): string {
     const file = resolveEnvFile(arg);
-    if (!fs.existsSync(file)) {
-        if (arg === 'default') return undefined;
+    if (!fs.existsSync(file))
         throw new Error(`environment file not found: ${file}`);
-    }
     if (!fs.statSync(file).isFile())
         throw new Error(`environment is not a file: ${file}`);
     const values = parseEnvFile(fs.readFileSync(file, 'utf-8'));

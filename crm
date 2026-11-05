@@ -1,11 +1,25 @@
 #!/usr/bin/env node
 
 // Load the environment file first: some modules read process.env at import time.
-const { extractEnvironmentFlag, loadEnvironment } = require('./build/cli/environment');
+// There is no default environment: it must be chosen with --environment, or
+// DATABASE_URL must already be set. Without either, list the available ones.
+const { extractEnvironmentFlag, loadEnvironment, listEnvironments, configDir } = require('./build/cli/environment');
 try {
-    const loaded = loadEnvironment(extractEnvironmentFlag(process.argv) || 'default');
-    if (loaded && process.argv[2] === 'init-crm')
-        console.error(`using environment: ${loaded}`);
+    const name = extractEnvironmentFlag(process.argv);
+    if (name) {
+        const loaded = loadEnvironment(name);
+        if (process.argv[2] === 'init-crm')
+            console.error(`using environment: ${loaded}`);
+    }
+    else if (!process.env.DATABASE_URL && !['v', 'version', '-v', '--version', undefined].includes(process.argv[2])) {
+        const available = listEnvironments();
+        if (available.length) {
+            console.error(`No environment selected. Pick one with --environment NAME:\n\n` +
+                available.map((n) => `  crm --environment ${n} ...`).join('\n') +
+                `\n\n(env files are in ${configDir()}; or set DATABASE_URL)`);
+            process.exit(1);
+        }
+    }
 }
 catch (e) {
     console.error(e.message);
@@ -56,8 +70,9 @@ Available commands:
 
 Options:
 
-  --environment NAME|PATH  load an env file: ~/.config/crm-cli/NAME.env, or PATH
-                           (default: "default"). Real environment variables take precedence.
+  --environment NAME|PATH  load an env file: ~/.config/crm-cli/NAME.env, or PATH.
+                           Required when env files exist and DATABASE_URL is not set.
+                           Real environment variables take precedence.
 
 Configure with environment variables:
 
