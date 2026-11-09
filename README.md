@@ -174,7 +174,9 @@ A company's `name` is its record key and can't be renamed. To show something fri
  * `crm about` shows `Display Name (key name)` and its filter matches it.
  * `{{COMPANY_NAME}}` (and `{{FRIENDLY_NAME}}` when a contact has no first name) use the display name in email templates.
 
-Commands that look a company up by name (`edit-company`, the API's `GET /companies/search/:filter`, ...) still match the record key only. It needs no server change: the server stores the field as-is.
+Commands that look a company up by name (`edit-company`, the API's `GET /companies/search/:filter`, ...) still match the record key only.
+
+Storing and showing the field needs no server upgrade: older servers store it as-is. Once the server runs this version, server-rendered templates use the display name too, and file-storage search matches it (CouchDB search still matches the key only).
 
 ## DATABASE_URL
 
