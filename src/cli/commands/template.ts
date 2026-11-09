@@ -18,7 +18,7 @@ Here are the available template fields.
 {{REGISTRATION_AGO}} ... Time since registration (example: 2 days ago)
 {{SUBSCRIPTION_AGO}} ... Time since subscription
 {{COMPANY_AGO}} ........ Time since first contact with the company
-{{COMPANY_NAME}} ....... Name of the company
+{{COMPANY_NAME}} ....... Name of the company (its display name when set)
 {{COMPANY_URL}} ........ Company's URL
 {{COMPANY_ADDRESS}} .... Company's website
   `) };

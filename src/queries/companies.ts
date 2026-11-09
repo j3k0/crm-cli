@@ -6,7 +6,7 @@ import { DatabaseSession } from "../database";
 
 export async function companies(database: DatabaseSession, filter?: string, delColumns?: (keyof Company)[]): Promise<PrintableArray<Company>> {
   const data = await database.dump();
-  const columns: (keyof Company)[] = ['name', 'url', 'address'];
+  const columns: (keyof Company)[] = ['name', 'url', 'address', 'displayName'];
   const displayColumns = columns.filter((c) => !delColumns || delColumns.indexOf(c) < 0);
   let out = data.companies.map(x => x);
   if (filter) {

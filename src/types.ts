@@ -19,7 +19,10 @@ export interface Config {
 export interface Company {
     createdAt?: string;
     updatedAt?: string;
+    /** Record key: can't be changed once the company exists. */
     name: string;
+    /** Name to show to humans (reports, templates) when the key isn't a good one. */
+    displayName?: string;
     address?: string;
     url?: string;
     contacts: Contact[];

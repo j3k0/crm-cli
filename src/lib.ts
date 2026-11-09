@@ -272,7 +272,7 @@ export async function editConfig(database: DatabaseSession, attributes: Partial<
  *  - {{REGISTRATION_AGO}} ... Time since registration (example: 2 days ago)
  *  - {{SUBSCRIPTION_AGO}} ... Time since subscription
  *  - {{COMPANY_AGO}} ........ Time since first contact with the company
- *  - {{COMPANY_NAME}} ....... Name of the company
+ *  - {{COMPANY_NAME}} ....... Name of the company (its display name when set)
  *  - {{COMPANY_URL}} ........ Company's URL
  *  - {{COMPANY_ADDRESS}} .... Company's website
  */
@@ -288,7 +288,7 @@ function replaceTag(content: string, tag: string, value: string): string {
 export function renderTemplateText(content: string, elements: { app?: App, contact?: Contact, company?: Company }): string {
     const { app, contact, company } = elements;
     if (contact) {
-        const defaultName = company?.name || app?.appName || 'user';
+        const defaultName = company?.displayName || company?.name || app?.appName || 'user';
         const friendlyName = contact.firstName || defaultName;
         const name = `${contact.firstName} ${contact.lastName}`.replace(/(^ )|( $)/g, '') || defaultName;
         content = replaceTag(content, '{{EMAIL}}', `${contact.email}`);
@@ -307,7 +307,7 @@ export function renderTemplateText(content: string, elements: { app?: App, conta
     }
     if (company) {
         content = replaceTag(content, '{{COMPANY_AGO}}', company.createdAt ? moment(new Date(company.createdAt)).fromNow() : '(unknown)');
-        content = replaceTag(content, '{{COMPANY_NAME}}', company.name);
+        content = replaceTag(content, '{{COMPANY_NAME}}', company.displayName || company.name);
         content = replaceTag(content, '{{COMPANY_URL}}', company.url || '');
         content = replaceTag(content, '{{COMPANY_ADDRESS}}', company.address || '');
     }
