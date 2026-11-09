@@ -13,6 +13,7 @@ export async function editCompany(database: DatabaseSession, filter?: string): P
       return;
   const edited = await editJson<Partial<Company>>({
       name: '',
+      displayName: '',
       url: '',
       address: '',
       ...(company as Partial<Company>),

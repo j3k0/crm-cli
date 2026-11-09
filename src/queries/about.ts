@@ -7,6 +7,7 @@ import { DatabaseSession } from "../database";
 
 export interface About {
   company: string;
+  displayName?: string;
   role?: string;
   email: string;
 }
@@ -21,6 +22,7 @@ export async function about(database: DatabaseSession, filter: string, delColumn
           const name = `${c.firstName} ${c.lastName}`.replace(/(^ )|( $)/g, '');
           out.push({
               company: company.name,
+              displayName: company.displayName,
               role: c.role,
               email: name ? `"${name}" <${c.email}>` : c.email,
           });
@@ -28,7 +30,7 @@ export async function about(database: DatabaseSession, filter: string, delColumn
   });
   if (filter) {
       const fuse = new Fuse(out, {
-          keys: ['company', 'email'],
+          keys: ['company', 'displayName', 'email'],
           matchAllTokens: true,
           threshold: 0.1,
           location: 0,
@@ -45,17 +47,19 @@ export async function about(database: DatabaseSession, filter: string, delColumn
           const table = new Table(Object.assign(
               { head: displayColumns },
               defaultTableOptions));
-          const companies: {[companyName: string]: boolean} = {};
+          // company name (record key) => label shown to the user
+          const companies: {[companyName: string]: string} = {};
           (out || []).forEach((line) => {
-              companies[line.company] = true;
-              table.push(displayColumns.map(cname => fieldToText(data, line, cname)));
+              const label = line.displayName ? `${line.displayName} (${line.company})` : line.company;
+              companies[line.company] = label;
+              table.push(displayColumns.map(cname => cname === 'company' ? label : fieldToText(data, line, cname)));
           });
           console.log('\nContacts:');
           console.log(tableToString(table));
-          for (const company of Object.keys(companies)) {
-              console.log(`\nApps from ${company}:`);
+          for (const [company, label] of Object.entries(companies)) {
+              console.log(`\nApps from ${label}:`);
               (await apps(database, company, ['company'])).printAsText();
-              console.log(`\nInteractions with ${company}:`);
+              console.log(`\nInteractions with ${label}:`);
               (await interactions(database, company, ['company'])).printAsText();
           }
       }
